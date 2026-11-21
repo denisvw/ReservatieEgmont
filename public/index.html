@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Appartement aan zee – Reservaties</title>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏖️</text></svg>">
+</head>
+<body>
+  <!-- Login -->
+  <section id="view-login" class="center-card" hidden>
+    <form id="login-form" class="card narrow">
+      <h1>🏖️ Appartement aan zee</h1>
+      <p class="muted">Log in om de kalender te bekijken en te reserveren.</p>
+      <label>E-mailadres <input type="email" name="email" autocomplete="username" required></label>
+      <label>Paswoord <input type="password" name="password" autocomplete="current-password" required></label>
+      <p class="error" id="login-error"></p>
+      <button type="submit" class="primary">Inloggen</button>
+      <p class="muted small">Nog geen toegang? Vraag het aan de beheerder.</p>
+    </form>
+  </section>
+
+  <!-- Verplicht paswoord wijzigen -->
+  <section id="view-change-pw" class="center-card" hidden>
+    <form id="force-pw-form" class="card narrow">
+      <h2>Kies een eigen paswoord</h2>
+      <p class="muted">Je bent ingelogd met een tijdelijk paswoord. Kies nu een nieuw paswoord (min. 8 tekens).</p>
+      <label>Tijdelijk paswoord <input type="password" name="current" autocomplete="current-password" required></label>
+      <label>Nieuw paswoord <input type="password" name="next" minlength="8" autocomplete="new-password" required></label>
+      <p class="error"></p>
+      <button type="submit" class="primary">Opslaan</button>
+    </form>
+  </section>
+
+  <!-- Hoofdapp -->
+  <div id="view-app" hidden>
+    <header class="topbar">
+      <div class="brand">🏖️ <span>Appartement aan zee</span></div>
+      <nav id="tabs">
+        <button data-tab="calendar" class="active">Kalender</button>
+        <button data-tab="chat">Chat <span id="chat-badge" class="badge" hidden></span></button>
+        <button data-tab="profile">Profiel</button>
+        <button data-tab="admin" id="tab-admin" hidden>Beheer</button>
+      </nav>
+      <div class="who"><span id="who-name"></span> <button id="logout" class="link">Uitloggen</button></div>
+    </header>
+
+    <main>
+      <!-- Kalender -->
+      <section id="tab-calendar" class="tab">
+        <div class="cal-head">
+          <button id="cal-prev" aria-label="Vorige maand">‹</button>
+          <h2 id="cal-title"></h2>
+          <button id="cal-next" aria-label="Volgende maand">›</button>
+          <button id="cal-today" class="ghost">Vandaag</button>
+          <span class="spacer"></span>
+          <button id="new-res" class="primary">+ Reservatie</button>
+        </div>
+        <div id="legend" class="legend"></div>
+        <div class="cal-grid" id="cal-grid"></div>
+        <h3>Komende periodes</h3>
+        <ul id="upcoming" class="upcoming"></ul>
+      </section>
+
+      <!-- Chat -->
+      <section id="tab-chat" class="tab" hidden>
+        <div class="chat">
+          <div id="chat-log" class="chat-log"></div>
+          <form id="chat-form" class="chat-form">
+            <textarea name="body" rows="2" placeholder="Schrijf een bericht… (wordt ook via WhatsApp gedeeld)" maxlength="2000" required></textarea>
+            <button type="submit" class="primary">Verstuur</button>
+          </form>
+        </div>
+      </section>
+
+      <!-- Profiel -->
+      <section id="tab-profile" class="tab" hidden>
+        <div class="two-col">
+          <form id="profile-form" class="card">
+            <h2>Mijn gegevens</h2>
+            <p class="muted" id="profile-party"></p>
+            <label>Naam <input name="name" required maxlength="80"></label>
+            <label>GSM-nummer (WhatsApp) <input name="phone" placeholder="+32470123456"></label>
+            <label class="check"><input type="checkbox" name="notify_whatsapp"> WhatsApp-meldingen ontvangen</label>
+            <div id="callmebot-block">
+              <label>CallMeBot API-sleutel <input name="callmebot_key" autocomplete="off" placeholder="laat leeg om te behouden"></label>
+              <details class="help">
+                <summary>Hoe krijg ik een CallMeBot-sleutel?</summary>
+                <ol>
+                  <li>Voeg het nummer <b>+34 644 51 95 23</b> toe aan je contacten (bv. "CallMeBot").</li>
+                  <li>Stuur via WhatsApp het bericht <code>I allow callmebot to send me messages</code> naar dat contact.</li>
+                  <li>Je krijgt een antwoord met je persoonlijke API-sleutel. Plak die hierboven.</li>
+                </ol>
+                <p class="small muted">Typ <code>-</code> om de sleutel te wissen. (Controleer het actuele nummer op callmebot.com.)</p>
+              </details>
+            </div>
+            <p class="error"></p>
+            <button class="primary">Opslaan</button>
+          </form>
+          <form id="pw-form" class="card">
+            <h2>Paswoord wijzigen</h2>
+            <label>Huidig paswoord <input type="password" name="current" autocomplete="current-password" required></label>
+            <label>Nieuw paswoord <input type="password" name="next" minlength="8" autocomplete="new-password" required></label>
+            <p class="error"></p>
+            <button class="primary">Wijzigen</button>
+          </form>
+        </div>
+      </section>
+
+      <!-- Beheer -->
+      <section id="tab-admin" class="tab" hidden>
+        <div class="two-col">
+          <form id="new-user-form" class="card">
+            <h2>Toegang geven</h2>
+            <p class="muted small">De nieuwe gebruiker krijgt een tijdelijk paswoord dat je zelf doorgeeft. Bij de eerste login moet die een eigen paswoord kiezen.</p>
+            <label>Naam <input name="name" required></label>
+            <label>E-mailadres <input type="email" name="email" required></label>
+            <label>Partij <select name="party" class="party-select-family"></select></label>
+            <label>GSM-nummer (optioneel) <input name="phone" placeholder="+32470123456"></label>
+            <label class="check"><input type="checkbox" name="is_admin"> Beheerder</label>
+            <p class="error"></p>
+            <button class="primary">Gebruiker aanmaken</button>
+            <div id="new-user-result" class="notice" hidden></div>
+          </form>
+          <div class="card">
+            <h2>WhatsApp</h2>
+            <p class="muted small">Actieve provider: <b id="wa-provider"></b></p>
+            <button id="wa-test" class="ghost">Testbericht versturen</button>
+            <p class="small" id="wa-test-result"></p>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Gebruikers</h2>
+          <div class="table-wrap"><table id="users-table">
+            <thead><tr><th>Naam</th><th>E-mail</th><th>Partij</th><th>Beheerder</th><th>Actief</th><th>WhatsApp</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Reservatie-dialoog -->
+  <dialog id="res-dialog">
+    <form id="res-form" method="dialog">
+      <h2 id="res-title">Nieuwe reservatie</h2>
+      <label>Partij <select name="party" id="res-party"></select></label>
+      <div class="row">
+        <label>Aankomst <input type="date" name="start_date" required></label>
+        <label>Vertrek <input type="date" name="end_date" required></label>
+      </div>
+      <p class="small muted" id="res-nights"></p>
+      <label>Opmerking <textarea name="note" rows="2" maxlength="500" placeholder="bv. met de kleinkinderen, of naam huurder"></textarea></label>
+      <p class="small muted" id="res-meta"></p>
+      <p class="error"></p>
+      <div class="actions">
+        <button type="button" id="res-delete" class="danger" hidden>Verwijderen</button>
+        <span class="spacer"></span>
+        <button type="button" id="res-cancel" class="ghost">Sluiten</button>
+        <button type="submit" id="res-save" class="primary">Opslaan</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="/app.js"></script>
+</body>
+</html>
