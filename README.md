@@ -32,19 +32,24 @@ ReservatieEgmont/
 
 ## Stappenplan om alles operationeel te maken
 
-Totaal ±1,5 uur, verspreid over twee momenten: het domein kan tot een paar uur nodig hebben voor het overal werkt.
+Totaal ±1,5 uur. Een pas gekocht domein heeft soms een paar uur nodig voor het overal werkt. Doe intussen gerust de andere stappen met het Netlify-adres.
 
 De site komt op **`https://zee.vanwaet.be`**. Zo blijft `vanwaet.be` zelf vrij voor later, bv. een familiesite of e-mailadressen. Wil je toch de site op `vanwaet.be` zelf, zie de opmerking bij stap 4.
 
-**Wat je nodig hebt:** je GitHub-account (zoals voor Gilles' world), een bankkaart voor het domein (±€10/jaar) en ongeveer een halfuur voor elk familielid om in te loggen en WhatsApp te koppelen.
+**Wat je nodig hebt:** je GitHub-account en je Netlify-account (dezelfde als voor Gilles' world), een bankkaart voor het domein (±€10–15/jaar) en ongeveer een halfuur voor elk familielid om in te loggen en WhatsApp te koppelen.
 
-### Stap 1: de domeinnaam `vanwaet.be` registreren (±10 min)
+Je koopt het domein via **Netlify**, net als `gilles-world.com`. Netlify regelt dan ook het DNS-beheer, dus alles staat op één plaats.
 
-1. Controleer op **dnsbelgium.be** (zoekvak *WHOIS*) dat `vanwaet.be` nog vrij is.
-2. Registreer het bij een registrar. Neem dezelfde als die van `gilles-world.com` als die `.be` aanbiedt, dan staat alles op één plaats. Anders een Belgische registrar zoals Combell, one.com of OVH.
-   - Je hebt **geen** webhosting- of mailpakket nodig, enkel de domeinnaam (met DNS-beheer, dat zit er altijd bij).
-   - Zet **automatische verlenging** aan.
-3. Houd het scherm **DNS-beheer / DNS-zone** van je registrar bij de hand. Je zet daar in stap 4 en 5 een paar records.
+### Stap 1: de domeinnaam `vanwaet.be` kopen via Netlify (±10 min)
+
+1. Log in op **app.netlify.com**. Klik links in het menu van je team op **Domains → Add or register domain** (of *Buy a domain*).
+2. Typ `vanwaet.be` en klik *Verify* / *Check availability*.
+   - **Beschikbaar met een prijs:** ga verder, vul je gegevens in en betaal. Zet **Auto-renew** aan.
+   - **Al in gebruik:** kies een andere naam, bv. `familievanwaet.be`, en pas die overal in dit stappenplan aan.
+   - **Netlify verkoopt geen `.be`:** zie het kader *Lukt `.be` niet via Netlify?* hieronder.
+3. Na de aankoop staat `vanwaet.be` onder **Domains**, met DNS-beheer bij Netlify. Je zet daar in stap 5 een paar records voor de mail. Het kan tot een paar uur duren voor een nieuw domein overal werkt.
+
+> **Lukt `.be` niet via Netlify?** Koop het domein dan bij een Belgische registrar (bv. Combell, one.com of OVH), enkel de domeinnaam zonder hosting. Voeg daarna in Netlify bij **Domains → Add or register domain** `vanwaet.be` toe als *bestaand domein* en kies **Set up Netlify DNS**. Netlify toont vier *nameservers* (`dns1.p0x.nsone.net` …). Vul die bij je registrar in onder *Nameservers / DNS-servers*. Vanaf dan beheer je alles in Netlify en werken stap 4 en 5 precies zoals hieronder.
 
 ### Stap 2: Supabase (±15 min)
 
@@ -64,28 +69,28 @@ De site komt op **`https://zee.vanwaet.be`**. Zo blijft `vanwaet.be` zelf vrij v
 ### Stap 3: de website op Netlify (±10 min)
 
 1. Op **netlify.com** (inloggen met GitHub): *Add new project → Import an existing project → GitHub* en kies `ReservatieEgmont`. Geef Netlify toegang tot die repository.
-2. **Branch to deploy**: `main`. Bestaat die nog niet, laat Claude de branch aanmaken of kies `claude/tender-curie-h6hm4j`.
+2. **Branch to deploy**: `main`.
 3. **Publish directory**: `site`. Laat *Build command* leeg.
 4. Klik *Deploy*. Onder *Project configuration → Change project name* noem je hem `appartement-zee`. Je krijgt dan het adres `https://appartement-zee.netlify.app`.
 5. Open dat adres: je ziet het inlogscherm. Inloggen lukt pas na stap 6.
 
-### Stap 4: `zee.vanwaet.be` koppelen aan Netlify (±5 min, daarna wachten)
+### Stap 4: `zee.vanwaet.be` koppelen aan de site (±2 min)
 
-1. Ga in Netlify naar **Domain management → Add a domain** en typ `zee.vanwaet.be`. Bevestig dat het jouw domein is. Kies **niet** voor *Netlify DNS*: je houdt het DNS-beheer bij je registrar.
-2. Maak bij je registrar in de DNS-zone van `vanwaet.be` dit record aan:
+1. Open in Netlify het project `appartement-zee` → **Domain management → Add a domain**.
+2. Typ `zee.vanwaet.be` en bevestig. Omdat `vanwaet.be` al bij Netlify staat, maakt Netlify het DNS-record zelf aan. Je hoeft niets in te vullen.
+3. Wacht tot er een groen vinkje en **HTTPS: certificate active** staan (meestal binnen enkele minuten, bij een pas gekocht domein soms een paar uur). Netlify stuurt bezoekers automatisch naar `https://`.
 
-   | Type | Naam / host | Waarde | TTL |
-   |---|---|---|---|
-   | `CNAME` | `zee` | `appartement-zee.netlify.app` | 3600 (of standaard) |
-
-3. Wacht tot Netlify bij het domein een groen vinkje toont (meestal 10 min, soms een paar uur). Netlify maakt dan automatisch het HTTPS-certificaat aan. Zet daarna in Netlify **Force HTTPS** aan als dat niet vanzelf gebeurt.
-
-> **Liever de site op `vanwaet.be` zelf?** Voeg dan in Netlify `vanwaet.be` toe. Zet bij je registrar een `A`-record met lege naam (of `@`) naar `75.2.60.5`, en een `CNAME` `www` naar `appartement-zee.netlify.app`. Vervang overal in dit stappenplan `zee.vanwaet.be` door `vanwaet.be`.
+> **Liever de site op `vanwaet.be` zelf?** Voeg dan in stap 4 `vanwaet.be` toe in plaats van `zee.vanwaet.be`. Netlify voegt `www.vanwaet.be` er vanzelf bij. Vervang overal in dit stappenplan `zee.vanwaet.be` door `vanwaet.be`.
 
 ### Stap 5: e-mail voor *Paswoord vergeten* via Resend (±10 min)
 
 1. Log in op **resend.com** met je bestaande account (dat van Gilles' world). Kies **Domains → Add domain** → `vanwaet.be`, regio **Ireland (eu-west-1)**.
-2. Resend toont 3 à 4 DNS-records: een `MX` en een `TXT` op `send`, een `TXT` op `resend._domainkey` en eventueel een `TXT` `_dmarc`. Zet ze exact zo in de DNS-zone bij je registrar en klik in Resend op **Verify**. Dat kan tot een uur duren.
+2. Resend toont 3 à 4 DNS-records: een `MX` en een `TXT` op `send`, een `TXT` op `resend._domainkey` en eventueel een `TXT` `_dmarc`. Zet ze in Netlify via **Domains → vanwaet.be → DNS settings → Add new record**:
+   - **Record type**: zoals Resend toont (`MX` of `TXT`)
+   - **Name**: enkel het deel vóór `.vanwaet.be`, dus `send`, `resend._domainkey` of `_dmarc`. Netlify vult `.vanwaet.be` zelf aan.
+   - **Value**: kopieer exact uit Resend. Bij het `MX`-record vul je de **Priority** apart in (meestal `10`).
+
+   Klik daarna in Resend op **Verify**. Dat kan tot een uur duren.
 3. Maak in Resend een nieuwe **API key** aan (*Sending access*, domein `vanwaet.be`).
 4. Ga in Supabase naar **Authentication → Emails → SMTP Settings** en zet *Enable Custom SMTP* aan:
    - Sender email `zee@vanwaet.be`, sender name `Appartement aan zee`
@@ -168,4 +173,4 @@ Pas in `supabase/schema.sql` de lijst bij `insert into public.parties` aan en vo
 
 - Supabase: gratis (aparte gratis organisatie)
 - Netlify en Resend: gratis
-- Domein `vanwaet.be`: ±10 euro per jaar
+- Domein `vanwaet.be` via Netlify: ±10–15 euro per jaar
