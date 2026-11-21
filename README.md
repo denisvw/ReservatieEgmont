@@ -1,60 +1,112 @@
-# Reservaties appartement aan zee
+# Appartement aan zee: handleiding
 
-Kleine webapp om het appartement te reserveren binnen de familie, met externe verhuur apart aangeduid.
+Een besloten website om het appartement te reserveren binnen de familie. Externe verhuur staat er duidelijk apart op. Het is dezelfde opbouw als Gilles' world: **Netlify** voor de website, **Supabase** voor login en database, en **Resend** voor de mails.
 
-**Functies**
-
-- Inloggen met e-mailadres + paswoord. Er is geen zelfregistratie: de beheerder maakt accounts aan en geeft een tijdelijk paswoord door. Bij de eerste login kiest de gebruiker een eigen paswoord.
-- Maandkalender met alle reservaties in een eigen kleur per partij. Externe verhuur (**EXTERNAL**) is donker en gestreept, zodat het duidelijk verschilt van de familie.
-- Partijen: Celine & Matthias, Nadine & Johan, Mieke & Denis, Nicolas & Jef en EXTERNAL.
-  - Een familielid kan enkel voor de eigen partij reserveren, wijzigen of annuleren.
-  - Externe verhuur kan alleen de beheerder ingeven. De beheerder kan ook alles wijzigen.
-  - Overlappende reservaties worden geweigerd. De vertrekdag mag wel de aankomstdag van de volgende zijn.
-- Chat voor iedereen. Elk bericht gaat ook via WhatsApp naar de anderen.
-- Elke nieuwe, gewijzigde of geannuleerde reservatie verschijnt in de chat en wordt via WhatsApp gedeeld.
-- Beheerpagina: gebruikers aanmaken, aan een partij koppelen, beheerder maken, deactiveren, paswoord resetten en een WhatsApp-test versturen.
-
-## Lokaal starten
-
-```bash
-npm install
-ADMIN_EMAIL=jij@voorbeeld.be ADMIN_PASSWORD=geheim123 ADMIN_NAME=Denis ADMIN_PARTY=mieke-denis npm start
-# → http://localhost:3000
+```
+ReservatieEgmont/
+  site/                    de website (gewone HTML, CSS en JavaScript, geen bouwstap)
+    index.html             login, kalender, chat, profiel en beheer
+    js/config.js           HIER vul je je twee Supabase-gegevens in
+    js/app.js
+    css/style.css
+    _headers               beveiligingsinstellingen voor Netlify
+  supabase/
+    schema.sql             database, partijen en beveiliging
+    functions/egmont/      WhatsApp-meldingen en gebruikers aanmaken
+  .github/workflows/
+    wakker-houden.yml      houdt een gratis Supabase-project actief
 ```
 
-Alle gegevens staan in één SQLite-bestand (`data/reservaties.db`, of in `DATA_DIR`). Een back-up maken is dat bestand kopiëren.
+## Wat de site doet
 
-## Online zetten: een eigen domeinnaam is niet nodig
+- **Inloggen** met e-mailadres en paswoord. Niemand kan zich zelf registreren. Jij maakt de accounts aan in **Beheer** en geeft het tijdelijke paswoord door. Bij de eerste login kiest iedereen een eigen paswoord. Via *Paswoord vergeten?* krijg je een mail.
+- **Kalender** per maand, met een kleur per partij: Celine & Matthias, Nadine & Johan, Mieke & Denis, Nicolas & Jef, Stefanie & Jonas, Mathis en **EXTERNAL**. Externe verhuur is donker en gestreept met het label "EXTERN". Onder de kalender staan de komende periodes.
+- **Regels**, afgedwongen in de database zelf, niet alleen in de pagina:
+  - Een familielid reserveert, wijzigt of annuleert alleen voor de eigen partij.
+  - Alleen de beheerder geeft externe verhuur in.
+  - Twee reservaties kunnen nooit overlappen. De vertrekdag mag wel de aankomstdag van de volgende zijn.
+- **Chat**: elk bericht gaat ook via WhatsApp naar de anderen. Elke nieuwe, gewijzigde of geannuleerde reservatie komt automatisch in de chat en gaat dus ook via WhatsApp rond.
+- **Beheer**: gebruikers aanmaken, aan een partij koppelen, beheerder maken, (de)activeren, een nieuw tijdelijk paswoord geven of verwijderen, en een WhatsApp-test sturen.
 
-Een hostingdienst geeft je gratis een adres zoals `https://appartement-zee.fly.dev`. Wil je later toch iets als `zee.vanwaet.be`, dan koop je die naam (± €10/jaar) en koppel je die aan dezelfde site.
+---
 
-### Aanbevolen: Fly.io (± €0–3/maand)
+## Stap 1: Supabase (±15 min)
 
-1. Maak een account op fly.io en installeer `flyctl`.
-2. Pas in `fly.toml` de `app`-naam aan (die naam bepaalt het adres).
-3. Voer uit:
+> **Maak een apart project**, niet in het project van Gilles' world. Zet het in een **nieuwe, gratis organisatie**. Een tweede project in je Pro-organisatie kost ongeveer 10 dollar per maand extra. Een gratis project pauzeert na een week zonder bezoek. Daarom is er de taak *wakker houden* (zie stap 6).
 
-```bash
-fly launch --no-deploy --copy-config
-fly volumes create reservaties_data --size 1 --region ams
-fly secrets set ADMIN_EMAIL=jij@voorbeeld.be ADMIN_PASSWORD='sterk-paswoord' ADMIN_NAME=Denis ADMIN_PARTY=mieke-denis SITE_URL=https://<app>.fly.dev
-fly deploy
-```
+1. Op **supabase.com**: *New organization* (plan **Free**), en daarin *New project*. Kies als regio **Central EU (Frankfurt)**.
+2. Ga naar **SQL Editor → New query**, plak de volledige inhoud van `supabase/schema.sql` en klik **Run**.
+3. Noteer bij **Project Settings → API** de **Project URL** en de **publishable/anon** key, en vul ze in `site/js/config.js` in.
+4. Ga naar **Authentication → Sign In / Providers**:
+   - Zet **Allow new users to sign up** **uit**. Zelfs als het aan zou staan, krijgt een vreemde geen toegang, want nieuwe accounts staan standaard op *niet actief*.
+   - Laat **Email** aan.
+5. Bij **Authentication → URL Configuration**:
+   - **Site URL**: bv. `https://zee.jouwdomein.be`
+   - **Redirect URLs**: `https://zee.jouwdomein.be/*` (en tijdens het testen ook je Netlify-adres)
 
-Andere opties die met de `Dockerfile` werken: Render of Railway (voorzie wel een *persistent disk/volume* voor `/data`), of een Synology NAS of Raspberry Pi thuis.
+## Stap 2: e-mail via Resend (±10 min)
+
+Je hergebruikt je bestaande Resend-account. Mails zijn alleen nodig voor *Paswoord vergeten*.
+
+1. Voeg in Resend je nieuwe domein toe en zet de DNS-records die Resend toont bij je domeinregistrar. Je kunt ook het domein van Gilles' world gebruiken als afzender.
+2. Ga in Supabase naar **Authentication → Emails → SMTP Settings** en zet *Custom SMTP* aan: host `smtp.resend.com`, poort `465`, gebruiker `resend`, wachtwoord = je Resend API key. Afzender bv. `zee@jouwdomein.be`, naam `Appartement aan zee`.
+3. Optioneel: zet onder **Templates** de mail *Reset Password* in het Nederlands.
+
+## Stap 3: de Edge Function voor WhatsApp en beheer (±10 min)
+
+1. Ga in Supabase naar **Edge Functions → Deploy a new function → Via Editor**. Noem ze **`egmont`**, plak de inhoud van `supabase/functions/egmont/index.ts` en zet **Verify JWT uit**. De functie controleert zelf wie haar aanroept.
+2. Vul bij **Edge Functions → Secrets** in:
+   - `WEBHOOK_SECRET`: een lange willekeurige tekst die je zelf verzint
+   - `SITE_URL`: bv. `https://zee.jouwdomein.be`
+   - `WHATSAPP_PROVIDER`: `callmebot` (of `none` om eerst te testen, zie onder)
+3. Ga naar **Database → Webhooks → Create a new hook**:
+   - Tabel **`messages`**, gebeurtenis **Insert**
+   - Type **Supabase Edge Functions**, functie `egmont`
+   - Voeg een HTTP-header toe: `x-webhook-secret` = dezelfde tekst als hierboven
+
+## Stap 4: de website online zetten met Netlify (±10 min)
+
+1. Kies op **netlify.com** *Add new site → Import an existing project → GitHub* en kies `ReservatieEgmont`.
+2. Zet **Publish directory** op `site`. Laat *Build command* leeg.
+3. Klik *Deploy*.
+4. Ga naar **Domain management → Add a domain**. Een subdomein van een domein dat je al hebt (bv. `zee.gilles-world.com` of `zee.vanwaet.be`) kost niets extra. Voor een nieuw domein betaal je ±10 euro per jaar. Netlify toont het DNS-record (meestal een `CNAME`) dat je bij je registrar zet. Het HTTPS-certificaat komt er automatisch bij.
+
+## Stap 5: jezelf beheerder maken
+
+1. Ga in Supabase naar **Authentication → Users → Add user → Create new user**. Vul je e-mailadres en een paswoord in en vink **Auto Confirm User** aan.
+2. Voer in de **SQL Editor** uit (met jouw adres):
+   ```sql
+   update public.profiles
+      set is_admin = true, active = true, must_change_password = false,
+          name = 'Denis', party = 'mieke-denis'
+    where email = 'jouw@email.be';
+   ```
+3. Log in op de site. Je ziet nu **Beheer**. Daar maak je de accounts voor de familie aan.
+
+## Stap 6: wakker houden (eenmalig, 1 min)
+
+Op GitHub, bij de repository: **Actions → Supabase wakker houden → Run workflow**. Daarna loopt de taak vanzelf elke drie dagen. Ze heeft niets nodig buiten `site/js/config.js`.
+
+---
 
 ## WhatsApp
 
-Stel `WHATSAPP_PROVIDER` in:
+Geen enkele officiële WhatsApp-dienst laat toe te posten in een bestaande **groep**. Iedereen krijgt de melding dus persoonlijk. Wie de actie zelf deed, krijgt geen melding.
 
-| Provider | Kost | Hoe |
+| `WHATSAPP_PROVIDER` | Kost | Hoe |
 |---|---|---|
-| `none` | – | Berichten komen alleen in de serverlog. Handig om te testen. |
-| `callmebot` | gratis | Elk familielid stuurt één keer een WhatsApp naar CallMeBot en krijgt een persoonlijke sleutel. Die vult hij of zij met het gsm-nummer in op de pagina **Profiel**. De uitleg staat ook in de app. |
-| `meta` | gratis tot ± 1000 gesprekken/maand | Officiële WhatsApp Cloud API. Je hebt een Meta Business-account, een apart telefoonnummer en een goedgekeurde berichttemplate nodig. Stel `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID` en `WHATSAPP_TEMPLATE` in. |
+| `none` | – | Er wordt niets verstuurd. Je ziet de berichten in de log van de Edge Function. |
+| `callmebot` | gratis | Elk familielid stuurt één keer `I allow callmebot to send me messages` naar het CallMeBot-nummer (zie callmebot.com). Daarna vult hij of zij het gsm-nummer en de ontvangen sleutel in op **Profiel**. De uitleg staat ook in de app. |
+| `meta` | gratis tot ± 1000 gesprekken/maand | Officiële WhatsApp Cloud API. Je hebt een Meta Business-account, een apart nummer en een goedgekeurde template met één parameter nodig. Extra secrets: `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_TEMPLATE`. |
 
-> Opgelet: geen enkele officiële WhatsApp-API laat toe te posten in een bestaande WhatsApp-groep. Iedereen krijgt de melding dus persoonlijk. Wie de actie zelf deed, krijgt geen melding.
+Test met de knop **Testbericht versturen** in Beheer.
 
-## Omgevingsvariabelen
+## Een partij toevoegen of hernoemen
 
-Zie `.env.example`.
+Pas in `supabase/schema.sql` de lijst bij `insert into public.parties` aan en voer het hele script opnieuw uit in de SQL Editor. Er gaat niets verloren. Koppel daarna de mensen aan hun partij in **Beheer**.
+
+## Kosten
+
+- Supabase: gratis (aparte gratis organisatie)
+- Netlify en Resend: gratis
+- Domein: niets extra bij een subdomein van een domein dat je al hebt, anders ±10 euro per jaar

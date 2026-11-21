@@ -1,36 +1,26 @@
 'use strict';
 
+const cfg = window.EGMONT_CONFIG || {};
+const db = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
+  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+});
+
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
 
 const state = {
-  user: null,
+  user: null, // eigen profiel
   parties: [],
-  provider: 'none',
+  people: new Map(), // id -> profiel (naam, partij)
   month: startOfMonth(new Date()),
   reservations: [],
   lastMsgId: 0,
   unread: 0,
   editing: null,
+  recovery: false,
 };
 
 // ---------- Hulpfuncties ----------
-async function api(path, { method = 'GET', body } = {}) {
-  const res = await fetch('/api' + path, {
-    method,
-    headers: body ? { 'Content-Type': 'application/json' } : {},
-    body: body ? JSON.stringify(body) : undefined,
-    credentials: 'same-origin',
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const err = new Error(data.error || `Fout ${res.status}`);
-    err.status = res.status;
-    throw err;
-  }
-  return data;
-}
-
 function startOfMonth(d) {
   return new Date(d.getFullYear(), d.getMonth(), 1);
 }
@@ -47,9 +37,11 @@ function parseIso(s) {
   return new Date(y, m - 1, d);
 }
 const fmt = (s) => parseIso(s).toLocaleDateString('nl-BE', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+const fmtShort = (s) => parseIso(s).toLocaleDateString('nl-BE', { day: 'numeric', month: 'short' });
 const nights = (a, b) => Math.round((parseIso(b) - parseIso(a)) / 86400000);
 const party = (key) => state.parties.find((p) => p.key === key) || { key, label: key, color: '#999' };
-const canManage = (key) => state.user.is_admin || (key !== 'external' && key === state.user.party);
+const personName = (id) => state.people.get(id)?.name || '?';
+const canManage = (key) => state.user.is_admin || (key === state.user.party && !party(key).external);
 
 function el(tag, attrs = {}, ...children) {
   const e = document.createElement(tag);
@@ -72,45 +64,105 @@ function show(view) {
   for (const v of ['login', 'change-pw', 'app']) $(`#view-${v}`).hidden = v !== view;
 }
 
-// ---------- Opstart ----------
-async function boot() {
-  try {
-    const me = await api('/me');
-    state.user = me.user;
-    state.parties = me.parties;
-    state.provider = me.whatsapp_provider;
-  } catch (e) {
-    if (e.status === 403) {
-      show('change-pw');
-      return;
-    }
-    show('login');
-    return;
+// Vertaalt databankfouten naar begrijpelijke taal.
+function friendly(error) {
+  if (!error) return '';
+  const m = error.message || String(error);
+  if (error.code === '23P01') return 'Deze periode overlapt met een bestaande reservatie.';
+  if (error.code === '42501' || /row-level security/i.test(m)) return 'Dit mag je niet doen met jouw account.';
+  if (/max_120_nachten/.test(m)) return 'Een reservatie kan maximaal 120 nachten duren.';
+  if (/vertrek_na_aankomst/.test(m)) return 'De vertrekdag moet na de aankomstdag liggen.';
+  if (/Invalid login credentials/i.test(m)) return 'E-mailadres of paswoord is onjuist.';
+  if (/should be different/i.test(m)) return 'Kies een ander paswoord dan het huidige.';
+  if (/Password should be at least/i.test(m)) return 'Het paswoord is te kort.';
+  return m;
+}
+async function check(promise) {
+  const { data, error } = await promise;
+  if (error) throw new Error(friendly(error));
+  return data;
+}
+
+async function callFunction(body) {
+  const { data, error } = await db.functions.invoke('egmont', { body });
+  if (error) {
+    let msg = error.message;
+    try {
+      msg = (await error.context.json()).error || msg;
+    } catch (_) { /* geen JSON */ }
+    throw new Error(msg);
   }
-  if (state.user.must_change_password) return show('change-pw');
+  return data;
+}
+
+// ---------- Opstart en login ----------
+async function boot() {
+  const { data: { session } } = await db.auth.getSession();
+  if (!session) return show('login');
+  const { data: me } = await db.from('profiles').select('*').eq('id', session.user.id).single();
+  if (!me || !me.active) {
+    await db.auth.signOut();
+    $('#login-error').textContent = 'Je account is (nog) niet actief. Vraag het aan de beheerder.';
+    return show('login');
+  }
+  state.user = me;
+  if (state.recovery || me.must_change_password) {
+    $('#force-pw-intro').textContent = state.recovery
+      ? 'Kies een nieuw paswoord (min. 8 tekens).'
+      : 'Je bent ingelogd met een tijdelijk paswoord. Kies nu een eigen paswoord (min. 8 tekens).';
+    return show('change-pw');
+  }
+  state.parties = await check(db.from('parties').select('*').order('sort'));
+  await loadPeople();
   show('app');
   initApp();
 }
+
+db.auth.onAuthStateChange((event) => {
+  if (event === 'PASSWORD_RECOVERY') {
+    state.recovery = true;
+    setTimeout(boot, 0);
+  }
+});
 
 $('#login-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const f = e.target;
   $('#login-error').textContent = '';
-  try {
-    await api('/login', { method: 'POST', body: { email: f.email.value, password: f.password.value } });
-    f.reset();
-    boot();
-  } catch (err) {
-    $('#login-error').textContent = err.message;
+  const { error } = await db.auth.signInWithPassword({ email: f.email.value.trim(), password: f.password.value });
+  if (error) {
+    $('#login-error').textContent = friendly(error);
+    return;
   }
+  f.reset();
+  boot();
 });
+
+$('#forgot').addEventListener('click', async () => {
+  const email = $('#login-form').email.value.trim() || prompt('Je e-mailadres:');
+  if (!email) return;
+  const { error } = await db.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
+  $('#login-error').textContent = error
+    ? friendly(error)
+    : 'Als dit adres bekend is, krijg je een mail met een link om een nieuw paswoord te kiezen.';
+});
+
+async function setPassword(form) {
+  const next = form.next.value;
+  if (next.length < 8) throw new Error('Het paswoord moet minstens 8 tekens hebben.');
+  if (next !== form.repeat.value) throw new Error('De twee paswoorden zijn niet gelijk.');
+  await check(db.auth.updateUser({ password: next }));
+  await check(db.rpc('password_changed'));
+}
 
 $('#force-pw-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const f = e.target;
   try {
-    await api('/me/password', { method: 'POST', body: { current: f.current.value, next: f.next.value } });
+    await setPassword(f);
     f.reset();
+    state.recovery = false;
+    if (location.hash) history.replaceState(null, '', location.pathname);
     boot();
   } catch (err) {
     showError(f, err.message);
@@ -118,7 +170,7 @@ $('#force-pw-form').addEventListener('submit', async (e) => {
 });
 
 $('#logout').addEventListener('click', async () => {
-  await api('/logout', { method: 'POST', body: {} }).catch(() => {});
+  await db.auth.signOut();
   location.reload();
 });
 
@@ -133,8 +185,19 @@ function initApp() {
   appInitialized = true;
   loadMonth();
   loadMessages(true);
-  setInterval(() => loadMessages(false), 8000);
-  setInterval(loadMonth, 60000);
+  // Live bijwerken; als reserve ook af en toe zelf kijken.
+  db.channel('live')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => loadMessages(false))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'reservations' }, () => loadMonth())
+    .subscribe();
+  setInterval(() => loadMessages(false), 30000);
+  setInterval(loadMonth, 120000);
+}
+
+async function loadPeople() {
+  const people = await check(db.from('profiles').select('id, name, party, email, phone, is_admin, active, must_change_password, notify_whatsapp').order('name'));
+  state.people = new Map(people.map((p) => [p.id, p]));
+  return people;
 }
 
 // ---------- Tabs ----------
@@ -154,8 +217,7 @@ const activeTab = () => $('#tabs button.active').dataset.tab;
 
 // ---------- Kalender ----------
 function renderLegend() {
-  const lg = $('#legend');
-  lg.replaceChildren(
+  $('#legend').replaceChildren(
     ...state.parties.map((p) =>
       el('span', { class: 'legend-item' }, el('span', { class: `swatch ${p.external ? 'ext' : ''}`, style: { background: p.color } }), p.external ? 'Externe verhuur' : p.label)
     )
@@ -164,26 +226,24 @@ function renderLegend() {
 
 async function loadMonth() {
   const first = state.month;
-  // Toon volledige weken (maandag t.e.m. zondag)
-  const gridStart = addDays(first, -((first.getDay() + 6) % 7));
+  const gridStart = addDays(first, -((first.getDay() + 6) % 7)); // maandag
   const gridEnd = addDays(gridStart, 42);
   try {
-    const [{ reservations }, all] = await Promise.all([
-      api(`/reservations?from=${iso(gridStart)}&to=${iso(gridEnd)}`),
-      api(`/reservations?from=${iso(new Date())}&to=9999-12-31`),
+    const [inGrid, upcoming] = await Promise.all([
+      check(db.from('reservations').select('*').gt('end_date', iso(gridStart)).lt('start_date', iso(gridEnd)).order('start_date')),
+      check(db.from('reservations').select('*').gt('end_date', iso(new Date())).order('start_date').limit(30)),
     ]);
-    state.reservations = reservations;
+    state.reservations = inGrid;
     renderCalendar(gridStart);
-    renderUpcoming(all.reservations);
+    renderUpcoming(upcoming);
   } catch (e) {
-    if (e.status === 401) location.reload();
+    console.error(e);
   }
 }
 
 function renderCalendar(gridStart) {
   const title = state.month.toLocaleDateString('nl-BE', { month: 'long', year: 'numeric' });
   $('#cal-title').textContent = title[0].toUpperCase() + title.slice(1);
-  const grid = $('#cal-grid');
   const heads = ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'].map((d) => el('div', { class: 'cal-dow' }, d));
   const today = iso(new Date());
   const cells = [];
@@ -191,12 +251,8 @@ function renderCalendar(gridStart) {
     const d = addDays(gridStart, i);
     const ds = iso(d);
     const inMonth = d.getMonth() === state.month.getMonth();
-    const cell = el('div', {
-      class: `cal-day ${inMonth ? '' : 'other'} ${ds === today ? 'today' : ''} ${ds < today ? 'past' : ''}`,
-      'data-date': ds,
-    });
+    const cell = el('div', { class: `cal-day ${inMonth ? '' : 'other'} ${ds === today ? 'today' : ''} ${ds < today ? 'past' : ''}` });
     cell.append(el('div', { class: 'num' }, String(d.getDate())));
-    // Reservaties die deze nacht bezetten, en vertrekken op deze dag
     for (const r of state.reservations) {
       const p = party(r.party);
       const occupies = r.start_date <= ds && ds < r.end_date;
@@ -204,7 +260,7 @@ function renderCalendar(gridStart) {
       if (!occupies && !departs) continue;
       const isStart = r.start_date === ds;
       const classes = ['chip', p.external ? 'ext' : '', departs ? 'depart' : '', isStart ? 'start' : ''].join(' ');
-      const label = departs ? `↦ vertrek` : isStart || d.getDay() === 1 ? p.external ? 'EXTERN' : p.label : '';
+      const label = departs ? '↦ vertrek' : isStart || d.getDay() === 1 ? (p.external ? 'EXTERN' : p.label) : '';
       cell.append(
         el(
           'button',
@@ -222,12 +278,11 @@ function renderCalendar(gridStart) {
       );
     }
     cell.addEventListener('click', () => {
-      if (ds < today) return;
-      openReservation(null, ds);
+      if (ds >= today) openReservation(null, ds);
     });
     cells.push(cell);
   }
-  grid.replaceChildren(...heads, ...cells);
+  $('#cal-grid').replaceChildren(...heads, ...cells);
 }
 
 function renderUpcoming(list) {
@@ -237,7 +292,7 @@ function renderUpcoming(list) {
     return;
   }
   ul.replaceChildren(
-    ...list.slice(0, 30).map((r) => {
+    ...list.map((r) => {
       const p = party(r.party);
       return el(
         'li',
@@ -251,25 +306,19 @@ function renderUpcoming(list) {
   );
 }
 
-$('#cal-prev').addEventListener('click', () => {
-  state.month = new Date(state.month.getFullYear(), state.month.getMonth() - 1, 1);
+function goMonth(delta) {
+  state.month = delta === 0 ? startOfMonth(new Date()) : new Date(state.month.getFullYear(), state.month.getMonth() + delta, 1);
   loadMonth();
-});
-$('#cal-next').addEventListener('click', () => {
-  state.month = new Date(state.month.getFullYear(), state.month.getMonth() + 1, 1);
-  loadMonth();
-});
-$('#cal-today').addEventListener('click', () => {
-  state.month = startOfMonth(new Date());
-  loadMonth();
-});
+}
+$('#cal-prev').addEventListener('click', () => goMonth(-1));
+$('#cal-next').addEventListener('click', () => goMonth(1));
+$('#cal-today').addEventListener('click', () => goMonth(0));
 $('#new-res').addEventListener('click', () => openReservation(null, iso(new Date())));
 
 // ---------- Reservatie-dialoog ----------
 function fillPartySelects() {
-  const resSel = $('#res-party');
   const allowed = state.parties.filter((p) => canManage(p.key));
-  resSel.replaceChildren(...allowed.map((p) => el('option', { value: p.key }, p.external ? 'EXTERNAL (externe verhuur)' : p.label)));
+  $('#res-party').replaceChildren(...allowed.map((p) => el('option', { value: p.key }, p.external ? 'EXTERNAL (externe verhuur)' : p.label)));
   for (const sel of $$('.party-select-family')) {
     sel.replaceChildren(
       el('option', { value: '' }, '— geen —'),
@@ -279,24 +328,19 @@ function fillPartySelects() {
 }
 
 function openReservation(r, startDate) {
-  const dlg = $('#res-dialog');
   const f = $('#res-form');
   showError(f, '');
-  state.editing = r;
-  const editable = r ? canManage(r.party) : true;
   if (!r && !state.parties.some((p) => canManage(p.key))) {
     alert('Je account is nog niet aan een partij gekoppeld. Vraag het aan de beheerder.');
     return;
   }
+  state.editing = r;
+  const editable = r ? canManage(r.party) : true;
   $('#res-title').textContent = r ? (editable ? 'Reservatie wijzigen' : 'Reservatie') : 'Nieuwe reservatie';
   const sel = $('#res-party');
-  // Bij bekijken van andermans reservatie: toon die partij als enige optie
-  if (r && !editable) {
-    sel.replaceChildren(el('option', { value: r.party }, party(r.party).label));
-  } else {
-    fillPartySelects();
-  }
-  sel.value = r ? r.party : state.user.party && canManage(state.user.party) ? state.user.party : sel.options[0]?.value;
+  if (r && !editable) sel.replaceChildren(el('option', { value: r.party }, party(r.party).label));
+  else fillPartySelects();
+  sel.value = r ? r.party : canManage(state.user.party) ? state.user.party : sel.options[0]?.value;
   f.start_date.value = r ? r.start_date : startDate;
   f.end_date.value = r ? r.end_date : iso(addDays(parseIso(startDate), 7));
   f.note.value = r ? r.note || '' : '';
@@ -304,10 +348,10 @@ function openReservation(r, startDate) {
   $('#res-save').hidden = !editable;
   $('#res-delete').hidden = !(r && editable);
   $('#res-meta').textContent = r
-    ? `Ingegeven door ${r.created_by_name || '?'}` + (r.updated_at !== r.created_at ? ` · laatst gewijzigd door ${r.updated_by_name || '?'}` : '')
+    ? `Ingegeven door ${personName(r.created_by)}` + (r.updated_at !== r.created_at ? ` · laatst gewijzigd door ${personName(r.updated_by)}` : '')
     : '';
   updateNights();
-  dlg.showModal();
+  $('#res-dialog').showModal();
 }
 
 function updateNights() {
@@ -327,10 +371,18 @@ $('#res-cancel').addEventListener('click', () => $('#res-dialog').close());
 $('#res-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const f = e.target;
-  const body = { party: f.party.value, start_date: f.start_date.value, end_date: f.end_date.value, note: f.note.value };
+  const row = { party: f.party.value, start_date: f.start_date.value, end_date: f.end_date.value, note: f.note.value.trim() };
   try {
-    if (state.editing) await api(`/reservations/${state.editing.id}`, { method: 'PUT', body });
-    else await api('/reservations', { method: 'POST', body });
+    if (row.end_date <= row.start_date) throw new Error('De vertrekdag moet na de aankomstdag liggen.');
+    // Vooraf kijken met wie het botst, voor een duidelijke melding.
+    let q = db.from('reservations').select('party, start_date, end_date').lt('start_date', row.end_date).gt('end_date', row.start_date).limit(1);
+    if (state.editing) q = q.neq('id', state.editing.id);
+    const [clash] = await check(q);
+    if (clash) {
+      throw new Error(`Overlapt met ${party(clash.party).label} (${fmtShort(clash.start_date)} – ${fmtShort(clash.end_date)}).`);
+    }
+    if (state.editing) await check(db.from('reservations').update(row).eq('id', state.editing.id).select().single());
+    else await check(db.from('reservations').insert(row).select().single());
     $('#res-dialog').close();
     loadMonth();
     loadMessages(false);
@@ -342,7 +394,7 @@ $('#res-form').addEventListener('submit', async (e) => {
 $('#res-delete').addEventListener('click', async () => {
   if (!state.editing || !confirm('Deze reservatie verwijderen?')) return;
   try {
-    await api(`/reservations/${state.editing.id}`, { method: 'DELETE' });
+    await check(db.from('reservations').delete().eq('id', state.editing.id));
     $('#res-dialog').close();
     loadMonth();
     loadMessages(false);
@@ -362,40 +414,47 @@ function updateBadge() {
   b.textContent = state.unread;
 }
 
+let loadingMessages = false;
 async function loadMessages(initial) {
+  if (loadingMessages) return;
+  loadingMessages = true;
   try {
-    const { messages } = await api(`/messages${initial ? '' : `?after=${state.lastMsgId}`}`);
+    let messages;
+    if (initial) {
+      messages = (await check(db.from('messages').select('*').order('id', { ascending: false }).limit(200))).reverse();
+    } else {
+      messages = await check(db.from('messages').select('*').gt('id', state.lastMsgId).order('id'));
+    }
     if (!messages.length) return;
     const log = $('#chat-log');
     const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 60;
     for (const m of messages) {
+      if (m.id <= state.lastMsgId) continue;
+      if (m.user_id && !state.people.has(m.user_id)) await loadPeople();
       log.append(renderMessage(m));
-      state.lastMsgId = Math.max(state.lastMsgId, m.id);
-      if (!initial && m.user_id !== state.user.id && activeTab() !== 'chat') state.unread++;
+      state.lastMsgId = m.id;
+      if (!initial && m.user_id !== state.user.id && m.actor_id !== state.user.id && activeTab() !== 'chat') state.unread++;
     }
     updateBadge();
     if (initial || atBottom) scrollChat();
   } catch (e) {
-    if (e.status === 401) location.reload();
+    console.error(e);
+  } finally {
+    loadingMessages = false;
   }
 }
 
 function renderMessage(m) {
-  const when = new Date(m.created_at.replace(' ', 'T') + 'Z').toLocaleString('nl-BE', {
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-  if (!m.user_id) {
+  const when = new Date(m.created_at).toLocaleString('nl-BE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  if (m.is_system) {
     return el('div', { class: 'msg system' }, el('div', { class: 'body' }, m.body), el('div', { class: 'time' }, when));
   }
-  const mine = m.user_id === state.user.id;
-  const p = m.user_party ? party(m.user_party) : null;
+  const author = state.people.get(m.user_id);
+  const p = author?.party ? party(author.party) : null;
   return el(
     'div',
-    { class: `msg ${mine ? 'mine' : ''}`, style: { '--c': p ? p.color : '#888' } },
-    el('div', { class: 'author' }, m.user_name || 'Verwijderde gebruiker', p ? el('span', { class: 'muted' }, ` · ${p.label}`) : null),
+    { class: `msg ${m.user_id === state.user.id ? 'mine' : ''}`, style: { '--c': p ? p.color : '#888' } },
+    el('div', { class: 'author' }, author?.name || 'Verwijderde gebruiker', p ? el('span', { class: 'muted' }, ` · ${p.label}`) : null),
     el('div', { class: 'body' }, m.body),
     el('div', { class: 'time' }, when)
   );
@@ -408,7 +467,7 @@ $('#chat-form').addEventListener('submit', async (e) => {
   if (!body) return;
   f.body.disabled = true;
   try {
-    await api('/messages', { method: 'POST', body: { body } });
+    await check(db.from('messages').insert({ body }));
     f.body.value = '';
     await loadMessages(false);
     scrollChat();
@@ -427,15 +486,15 @@ $('#chat-form').body.addEventListener('keydown', (e) => {
 });
 
 // ---------- Profiel ----------
-function fillProfile() {
+async function fillProfile() {
   const f = $('#profile-form');
   const u = state.user;
   f.name.value = u.name;
-  f.phone.value = u.phone;
+  f.phone.value = u.phone || '';
   f.notify_whatsapp.checked = u.notify_whatsapp;
   f.callmebot_key.value = '';
-  f.callmebot_key.placeholder = u.has_callmebot_key ? 'ingesteld – laat leeg om te behouden' : 'nog niet ingesteld';
-  $('#callmebot-block').hidden = state.provider !== 'callmebot';
+  const { data: key } = await db.from('whatsapp_keys').select('user_id').eq('user_id', u.id).maybeSingle();
+  f.callmebot_key.placeholder = key ? 'ingesteld – laat leeg om te behouden' : 'nog niet ingesteld';
   $('#profile-party').textContent = u.party ? `Partij: ${party(u.party).label}` : 'Nog niet aan een partij gekoppeld.';
 }
 
@@ -443,13 +502,20 @@ $('#profile-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const f = e.target;
   try {
-    const { user } = await api('/me', {
-      method: 'PUT',
-      body: { name: f.name.value, phone: f.phone.value, callmebot_key: f.callmebot_key.value, notify_whatsapp: f.notify_whatsapp.checked },
-    });
+    const name = f.name.value.trim().slice(0, 80);
+    if (!name) throw new Error('Naam is verplicht.');
+    const user = await check(
+      db.from('profiles')
+        .update({ name, phone: f.phone.value.trim() || null, notify_whatsapp: f.notify_whatsapp.checked })
+        .eq('id', state.user.id).select().single()
+    );
+    const key = f.callmebot_key.value.trim();
+    if (key === '-') await check(db.from('whatsapp_keys').delete().eq('user_id', user.id));
+    else if (key) await check(db.from('whatsapp_keys').upsert({ user_id: user.id, callmebot_key: key }));
     state.user = user;
-    fillProfile();
+    state.people.set(user.id, user);
     $('#who-name').textContent = user.name;
+    await fillProfile();
     showError(f, '');
     alert('Gegevens opgeslagen.');
   } catch (err) {
@@ -461,7 +527,7 @@ $('#pw-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const f = e.target;
   try {
-    await api('/me/password', { method: 'POST', body: { current: f.current.value, next: f.next.value } });
+    await setPassword(f);
     f.reset();
     showError(f, '');
     alert('Paswoord gewijzigd.');
@@ -472,26 +538,25 @@ $('#pw-form').addEventListener('submit', async (e) => {
 
 // ---------- Beheer ----------
 async function loadUsers() {
-  $('#wa-provider').textContent = state.provider;
-  const { users } = await api('/admin/users');
-  const tbody = $('#users-table tbody');
-  tbody.replaceChildren(
+  const users = await loadPeople();
+  $('#users-table tbody').replaceChildren(
     ...users.map((u) => {
-      const partySel = el(
-        'select',
-        {
-          onchange: (e) => updateUser(u.id, { party: e.target.value || null }),
-        },
-        el('option', { value: '' }, '— geen —'),
-        ...state.parties.filter((p) => !p.external).map((p) => el('option', { value: p.key, selected: p.key === u.party }, p.label))
-      );
       const isMe = u.id === state.user.id;
       return el(
         'tr',
         { class: u.active ? '' : 'inactive' },
         el('td', {}, u.name, u.must_change_password ? el('span', { class: 'tag' }, 'tijdelijk pw') : null),
         el('td', {}, u.email),
-        el('td', {}, partySel),
+        el(
+          'td',
+          {},
+          el(
+            'select',
+            { onchange: (e) => updateUser(u.id, { party: e.target.value || null }) },
+            el('option', { value: '' }, '— geen —'),
+            ...state.parties.filter((p) => !p.external).map((p) => el('option', { value: p.key, selected: p.key === u.party }, p.label))
+          )
+        ),
         el('td', {}, el('input', { type: 'checkbox', checked: u.is_admin, disabled: isMe, onchange: (e) => updateUser(u.id, { is_admin: e.target.checked }) })),
         el('td', {}, el('input', { type: 'checkbox', checked: u.active, disabled: isMe, onchange: (e) => updateUser(u.id, { active: e.target.checked }) })),
         el('td', { class: 'small' }, u.phone ? `${u.phone}${u.notify_whatsapp ? '' : ' (uit)'}` : '—'),
@@ -508,7 +573,7 @@ async function loadUsers() {
 
 async function updateUser(id, patch) {
   try {
-    await api(`/admin/users/${id}`, { method: 'PUT', body: patch });
+    await check(db.from('profiles').update(patch).eq('id', id));
   } catch (err) {
     alert(err.message);
   }
@@ -517,14 +582,22 @@ async function updateUser(id, patch) {
 
 async function resetPassword(u) {
   if (!confirm(`Nieuw tijdelijk paswoord aanmaken voor ${u.name}?`)) return;
-  const { temp_password } = await api(`/admin/users/${u.id}/reset-password`, { method: 'POST', body: {} });
-  prompt(`Tijdelijk paswoord voor ${u.name} (geef dit door):`, temp_password);
+  try {
+    const { temp_password } = await callFunction({ action: 'reset-password', id: u.id });
+    prompt(`Tijdelijk paswoord voor ${u.name} (geef dit door):`, temp_password);
+  } catch (err) {
+    alert(err.message);
+  }
   loadUsers();
 }
 
 async function deleteUser(u) {
-  if (!confirm(`${u.name} definitief verwijderen? (Deactiveren kan ook via "Actief".)`)) return;
-  await api(`/admin/users/${u.id}`, { method: 'DELETE' }).catch((e) => alert(e.message));
+  if (!confirm(`${u.name} definitief verwijderen? (Tijdelijk uitschakelen kan ook via "Actief".)`)) return;
+  try {
+    await callFunction({ action: 'delete-user', id: u.id });
+  } catch (err) {
+    alert(err.message);
+  }
   loadUsers();
 }
 
@@ -532,10 +605,16 @@ $('#new-user-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const f = e.target;
   showError(f, '');
+  const btn = $('button.primary', f);
+  btn.disabled = true;
   try {
-    const { user, temp_password } = await api('/admin/users', {
-      method: 'POST',
-      body: { name: f.name.value, email: f.email.value, party: f.party.value || null, phone: f.phone.value, is_admin: f.is_admin.checked },
+    const user = await callFunction({
+      action: 'create-user',
+      name: f.name.value,
+      email: f.email.value,
+      party: f.party.value || null,
+      phone: f.phone.value,
+      is_admin: f.is_admin.checked,
     });
     const box = $('#new-user-result');
     box.hidden = false;
@@ -543,19 +622,29 @@ $('#new-user-form').addEventListener('submit', async (e) => {
       el('b', {}, `${user.name} aangemaakt.`),
       el('br'),
       'Geef deze gegevens door:',
-      el('pre', {}, `Site: ${location.origin}\nE-mail: ${user.email}\nTijdelijk paswoord: ${temp_password}`)
+      el('pre', {}, `Site: ${location.origin}\nE-mail: ${user.email}\nTijdelijk paswoord: ${user.temp_password}`)
     );
     f.reset();
     loadUsers();
   } catch (err) {
     showError(f, err.message);
+  } finally {
+    btn.disabled = false;
   }
 });
 
 $('#wa-test').addEventListener('click', async () => {
-  const { provider } = await api('/admin/whatsapp-test', { method: 'POST', body: {} });
-  $('#wa-test-result').textContent =
-    provider === 'none' ? 'Provider is "none": het bericht staat enkel in de serverlog.' : 'Verstuurd naar alle gebruikers met een ingesteld GSM-nummer.';
+  const out = $('#wa-test-result');
+  out.textContent = 'Bezig…';
+  try {
+    const { provider, sent } = await callFunction({ action: 'whatsapp-test' });
+    out.textContent =
+      provider === 'none'
+        ? 'WHATSAPP_PROVIDER staat op "none": het bericht staat enkel in de log van de Edge Function.'
+        : `Verstuurd via ${provider} naar ${sent} persoon/personen.`;
+  } catch (err) {
+    out.textContent = err.message;
+  }
 });
 
 boot();
