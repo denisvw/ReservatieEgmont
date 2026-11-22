@@ -34,28 +34,28 @@ ReservatieEgmont/
 
 Totaal ±1,5 uur. Een pas gekocht domein heeft soms een paar uur nodig voor het overal werkt. Doe intussen gerust de andere stappen met het Netlify-adres.
 
-De site komt op **`https://zee.vanwaet.be`**. Zo blijft `vanwaet.be` zelf vrij voor later, bv. een familiesite of e-mailadressen. Wil je toch de site op `vanwaet.be` zelf, zie de opmerking bij stap 4.
+De site komt op **`https://zee.vanwaetermeulen.be`**. Zo blijft `vanwaetermeulen.be` zelf vrij voor later, bv. een familiesite of e-mailadressen. Wil je toch de site op `vanwaetermeulen.be` zelf, zie de opmerking bij stap 4.
 
-**Wat je nodig hebt:** je GitHub- en Netlify-account (dezelfde als voor Gilles' world), je Combell-account met het domein `vanwaet.be`, en ongeveer een halfuur voor elk familielid om in te loggen en WhatsApp te koppelen.
+**Wat je nodig hebt:** je GitHub- en Netlify-account (dezelfde als voor Gilles' world), je Combell-account met het domein `vanwaetermeulen.be`, en ongeveer een halfuur voor elk familielid om in te loggen en WhatsApp te koppelen.
 
 Het domein staat bij **Combell**, maar het DNS-beheer doet **Netlify**. Zo werkt alles verder zoals bij Gilles' world: de site, het certificaat en de mailrecords regel je in Netlify. Combell stuurt je enkel nog de jaarlijkse factuur.
 
-### Stap 1: het domein `vanwaet.be` van Combell naar Netlify DNS laten wijzen (±10 min, daarna wachten)
+### Stap 1: het domein `vanwaetermeulen.be` van Combell naar Netlify DNS laten wijzen (±10 min, daarna wachten)
 
 **1a. Het domein toevoegen in Netlify**
 
 1. Log in op **app.netlify.com**, in hetzelfde team als Gilles' world. Klik links op **Domains → Add or register domain**.
-2. Typ `vanwaet.be` en klik *Verify*. Netlify ziet dat het domein al bestaat. Bevestig dat het van jou is (*Add domain* / *Yes, add domain*).
+2. Typ `vanwaetermeulen.be` en klik *Verify*. Netlify ziet dat het domein al bestaat. Bevestig dat het van jou is (*Add domain* / *Yes, add domain*).
 3. Kies **Set up Netlify DNS** en klik door. Records die Netlify voorstelt, mag je overslaan: er staat nog niets op het domein.
-4. Op het laatste scherm toont Netlify **vier nameservers**, bv. `dns1.p05.nsone.net` tot `dns4.p05.nsone.net`. Laat dat scherm open of noteer ze. Je vindt ze later ook terug bij **Domains → vanwaet.be → DNS settings**.
+4. Op het laatste scherm toont Netlify **vier nameservers**, bv. `dns1.p05.nsone.net` tot `dns4.p05.nsone.net`. Laat dat scherm open of noteer ze. Je vindt ze later ook terug bij **Domains → vanwaetermeulen.be → DNS settings**.
 
 **1b. De nameservers invullen bij Combell**
 
-1. Log in op **my.combell.com** en open bij je producten het domein `vanwaet.be`.
+1. Log in op **my.combell.com** en open bij je producten het domein `vanwaetermeulen.be`.
 2. Staat **DNSSEC** aan, zet het dan eerst **uit**. Met DNSSEC aan kan de overstap naar Netlify mislukken.
 3. Kies **Naamservers** (ook *Nameservers* of *DNS-servers wijzigen*) → **Eigen/aangepaste naamservers**.
 4. Vervang de naamservers van Combell door de vier van Netlify, één per regel, en bewaar.
-5. Wacht. Na enkele minuten tot hoogstens een paar uur staat in Netlify bij **Domains → vanwaet.be** dat Netlify DNS actief is. Doe intussen gerust stap 2 en 3.
+5. Wacht. Na enkele minuten tot hoogstens een paar uur staat in Netlify bij **Domains → vanwaetermeulen.be** dat Netlify DNS actief is. Doe intussen gerust stap 2 en 3.
 
 > Combell kan waarschuwen dat de DNS-instellingen bij Combell niet meer gebruikt worden. Dat klopt en is de bedoeling: vanaf nu wijzig je DNS-records enkel nog in Netlify.
 
@@ -71,8 +71,8 @@ Het domein staat bij **Combell**, maar het DNS-beheer doet **Netlify**. Zo werkt
    - Zet **Allow new users to sign up** **uit**.
    - Laat **Email** aan.
 6. Bij **Authentication → URL Configuration**:
-   - **Site URL**: `https://zee.vanwaet.be`
-   - **Redirect URLs**: `https://zee.vanwaet.be/*`, en tijdelijk ook je Netlify-adres uit stap 3, bv. `https://appartement-zee.netlify.app/*`
+   - **Site URL**: `https://zee.vanwaetermeulen.be`
+   - **Redirect URLs**: `https://zee.vanwaetermeulen.be/*`, en tijdelijk ook je Netlify-adres uit stap 3, bv. `https://appartement-zee.netlify.app/*`
 
 ### Stap 3: de website op Netlify (±10 min)
 
@@ -82,26 +82,26 @@ Het domein staat bij **Combell**, maar het DNS-beheer doet **Netlify**. Zo werkt
 4. Klik *Deploy*. Onder *Project configuration → Change project name* noem je hem `appartement-zee`. Je krijgt dan het adres `https://appartement-zee.netlify.app`.
 5. Open dat adres: je ziet het inlogscherm. Inloggen lukt pas na stap 6.
 
-### Stap 4: `zee.vanwaet.be` koppelen aan de site (±2 min)
+### Stap 4: `zee.vanwaetermeulen.be` koppelen aan de site (±2 min)
 
 1. Open in Netlify het project `appartement-zee` → **Domain management → Add a domain**.
-2. Typ `zee.vanwaet.be` en bevestig. Omdat `vanwaet.be` al bij Netlify staat, maakt Netlify het DNS-record zelf aan. Je hoeft niets in te vullen.
+2. Typ `zee.vanwaetermeulen.be` en bevestig. Omdat `vanwaetermeulen.be` al bij Netlify staat, maakt Netlify het DNS-record zelf aan. Je hoeft niets in te vullen.
 3. Wacht tot er een groen vinkje en **HTTPS: certificate active** staan (meestal binnen enkele minuten, bij een pas gekocht domein soms een paar uur). Netlify stuurt bezoekers automatisch naar `https://`.
 
-> **Liever de site op `vanwaet.be` zelf?** Voeg dan in stap 4 `vanwaet.be` toe in plaats van `zee.vanwaet.be`. Netlify voegt `www.vanwaet.be` er vanzelf bij. Vervang overal in dit stappenplan `zee.vanwaet.be` door `vanwaet.be`.
+> **Liever de site op `vanwaetermeulen.be` zelf?** Voeg dan in stap 4 `vanwaetermeulen.be` toe in plaats van `zee.vanwaetermeulen.be`. Netlify voegt `www.vanwaetermeulen.be` er vanzelf bij. Vervang overal in dit stappenplan `zee.vanwaetermeulen.be` door `vanwaetermeulen.be`.
 
 ### Stap 5: e-mail voor *Paswoord vergeten* via Resend (±10 min)
 
-1. Log in op **resend.com** met je bestaande account (dat van Gilles' world). Kies **Domains → Add domain** → `vanwaet.be`, regio **Ireland (eu-west-1)**.
-2. Resend toont 3 à 4 DNS-records: een `MX` en een `TXT` op `send`, een `TXT` op `resend._domainkey` en eventueel een `TXT` `_dmarc`. Zet ze in Netlify via **Domains → vanwaet.be → DNS settings → Add new record**:
+1. Log in op **resend.com** met je bestaande account (dat van Gilles' world). Kies **Domains → Add domain** → `vanwaetermeulen.be`, regio **Ireland (eu-west-1)**.
+2. Resend toont 3 à 4 DNS-records: een `MX` en een `TXT` op `send`, een `TXT` op `resend._domainkey` en eventueel een `TXT` `_dmarc`. Zet ze in Netlify via **Domains → vanwaetermeulen.be → DNS settings → Add new record**:
    - **Record type**: zoals Resend toont (`MX` of `TXT`)
-   - **Name**: enkel het deel vóór `.vanwaet.be`, dus `send`, `resend._domainkey` of `_dmarc`. Netlify vult `.vanwaet.be` zelf aan.
+   - **Name**: enkel het deel vóór `.vanwaetermeulen.be`, dus `send`, `resend._domainkey` of `_dmarc`. Netlify vult `.vanwaetermeulen.be` zelf aan.
    - **Value**: kopieer exact uit Resend. Bij het `MX`-record vul je de **Priority** apart in (meestal `10`).
 
    Klik daarna in Resend op **Verify**. Dat kan tot een uur duren.
-3. Maak in Resend een nieuwe **API key** aan (*Sending access*, domein `vanwaet.be`).
+3. Maak in Resend een nieuwe **API key** aan (*Sending access*, domein `vanwaetermeulen.be`).
 4. Ga in Supabase naar **Authentication → Emails → SMTP Settings** en zet *Enable Custom SMTP* aan:
-   - Sender email `zee@vanwaet.be`, sender name `Appartement aan zee`
+   - Sender email `zee@vanwaetermeulen.be`, sender name `Appartement aan zee`
    - Host `smtp.resend.com`, port `465`, username `resend`, password = de nieuwe Resend API key
 5. Optioneel: onder **Emails → Templates → Reset Password** het onderwerp en de tekst in het Nederlands zetten, bv. onderwerp *Nieuw paswoord voor het appartement aan zee*.
 
@@ -115,14 +115,14 @@ Het domein staat bij **Combell**, maar het DNS-beheer doet **Netlify**. Zo werkt
           name = 'Denis', party = 'mieke-denis'
     where email = 'jouw@email.be';
    ```
-3. Log in op `https://zee.vanwaet.be` (of nog op het Netlify-adres). Je ziet de kalender en het tabblad **Beheer**.
+3. Log in op `https://zee.vanwaetermeulen.be` (of nog op het Netlify-adres). Je ziet de kalender en het tabblad **Beheer**.
 
 ### Stap 7: WhatsApp en beheer (Edge Function, ±15 min)
 
 1. Ga in Supabase naar **Edge Functions → Deploy a new function → Via Editor**. Naam: **`egmont`**. Plak de inhoud van `supabase/functions/egmont/index.ts` en klik *Deploy*. Zet daarna bij de functie onder *Details* **Verify JWT with legacy secret** (of *Enforce JWT*) **uit**. De functie controleert zelf wie haar aanroept.
 2. Vul bij **Edge Functions → Secrets** in:
    - `WEBHOOK_SECRET`: een lange willekeurige tekst die je zelf verzint (bv. 40 tekens uit een paswoordgenerator)
-   - `SITE_URL`: `https://zee.vanwaet.be`
+   - `SITE_URL`: `https://zee.vanwaetermeulen.be`
    - `WHATSAPP_PROVIDER`: eerst `none`, na de test in stap 9 `callmebot`
 3. Ga naar **Database → Webhooks** (eerst eventueel *Enable webhooks*) → **Create a new hook**:
    - Naam `whatsapp`, tabel **`messages`**, gebeurtenis **Insert**
@@ -145,17 +145,17 @@ Een gratis Supabase-project pauzeert na een week zonder bezoek. Ga op GitHub bij
 
 Maak per persoon een account aan in **Beheer → Toegang geven**: naam, e-mailadres en partij (Celine & Matthias, Nadine & Johan, Mieke & Denis, Nicolas & Jef, Stefanie & Jonas, Mathis). Stuur elk de gegevens die op het scherm verschijnen, met dit bericht:
 
-> Hallo! Je kan nu het appartement reserveren op https://zee.vanwaet.be
+> Hallo! Je kan nu het appartement reserveren op https://zee.vanwaetermeulen.be
 > Log in met je e-mailadres en dit tijdelijk paswoord: …
 > Je kiest daarna zelf een paswoord. Wil je WhatsApp-meldingen? Volg de uitleg bij *Profiel*.
 
 ### Eindcontrole
 
-- [ ] `https://zee.vanwaet.be` toont het inlogscherm met een slotje (HTTPS).
+- [ ] `https://zee.vanwaetermeulen.be` toont het inlogscherm met een slotje (HTTPS).
 - [ ] Een familielid kan inloggen, moet een eigen paswoord kiezen en kan voor de eigen partij reserveren, maar niet voor een andere partij of EXTERNAL.
 - [ ] Een overlappende reservatie wordt geweigerd.
 - [ ] Een reservatie en een chatbericht komen in de chat **en** via WhatsApp bij de anderen.
-- [ ] *Paswoord vergeten?* stuurt een mail van `zee@vanwaet.be`, en de link laat een nieuw paswoord kiezen.
+- [ ] *Paswoord vergeten?* stuurt een mail van `zee@vanwaetermeulen.be`, en de link laat een nieuw paswoord kiezen.
 - [ ] De GitHub-taak *Supabase wakker houden* staat op groen.
 - [ ] Verwijder in Supabase bij **Redirect URLs** het tijdelijke Netlify-adres.
 
@@ -181,4 +181,4 @@ Pas in `supabase/schema.sql` de lijst bij `insert into public.parties` aan en vo
 
 - Supabase: gratis (aparte gratis organisatie)
 - Netlify en Resend: gratis
-- Domein `vanwaet.be` bij Combell: zie je Combell-factuur (±10–15 euro per jaar). Netlify DNS is gratis.
+- Domein `vanwaetermeulen.be` bij Combell: zie je Combell-factuur (±10–15 euro per jaar). Netlify DNS is gratis.

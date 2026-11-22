@@ -10,7 +10,7 @@
 //
 // Secrets (Supabase > Edge Functions > Secrets):
 //   WEBHOOK_SECRET     zelfgekozen lange willekeurige tekst (ook in de webhook-header)
-//   SITE_URL           bv. https://zee.vanwaet.be
+//   SITE_URL           bv. https://zee.vanwaetermeulen.be
 //   WHATSAPP_PROVIDER  none | callmebot | meta          (standaard: none)
 //   Voor meta:  WHATSAPP_TOKEN, WHATSAPP_PHONE_NUMBER_ID,
 //               WHATSAPP_TEMPLATE (optioneel), WHATSAPP_TEMPLATE_LANG (standaard nl)
