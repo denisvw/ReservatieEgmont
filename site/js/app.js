@@ -728,22 +728,47 @@ function renderYear(y, list) {
     for (let i = 0; i < (first.getDay() + 6) % 7; i++) grid.append(el('div'));
     for (let d = first; d.getMonth() === m; d = addDays(d, 1)) {
       const ds = iso(d);
+      // r = wie die nacht in het appartement slaapt; dep = wie die dag vertrekt.
       const r = list.find((x) => x.start_date <= ds && ds < x.end_date);
+      const dep = list.find((x) => x.end_date === ds);
       const p = r ? party(r.party) : null;
+      const pd = dep ? party(dep.party) : null;
+      const arrives = r && r.start_date === ds;
       const school = schoolHoliday(ds);
       const feest = feestdag(ds);
-      const title = [fmt(ds), p ? (p.external ? 'Externe verhuur' : p.label) : null, school?.label, feest ? `★ ${feest.label}` : null]
+      const plabel = (x) => (x.external ? 'Externe verhuur' : x.label);
+      const title = [
+        fmt(ds),
+        pd ? `${plabel(pd)}: vertrek` : null,
+        p ? `${plabel(p)}${arrives ? ': aankomst' : ''}` : null,
+        school?.label,
+        feest ? `★ ${feest.label}` : null,
+      ]
         .filter(Boolean)
         .join('\n');
+      const style = {};
+      if (p) style['--c'] = p.color;
+      if (pd) style['--d'] = pd.color;
       grid.append(
         el(
           'button',
           {
-            class: ['mini-day', state.pick === ds ? 'picked' : '', p ? 'busy' : '', p?.external ? 'ext' : '', school ? 'school' : '', feest ? 'feest' : '', ds === today ? 'today' : '', ds < today ? 'past' : '']
-              .join(' '),
-            style: p ? { '--c': p.color } : {},
+            class: [
+              'mini-day',
+              state.pick === ds ? 'picked' : '',
+              p ? 'busy' : '',
+              arrives ? 'arr' : '',
+              pd ? 'dep' : '',
+              p?.external && !arrives ? 'ext' : '',
+              school ? 'school' : '',
+              feest ? 'feest' : '',
+              ds === today ? 'today' : '',
+              ds < today ? 'past' : '',
+            ].join(' '),
+            style,
             title,
             'data-date': ds,
+            // Een vertrekdag is vrij als aankomstdag voor iemand anders.
             onclick: () => yearDayClick(ds, r),
             onmouseenter: () => previewRange(ds),
           },
@@ -861,7 +886,7 @@ function updateYearHint(error) {
   h.textContent =
     error ||
     (state.pick
-      ? `Aankomst ${fmt(state.pick)}. Klik nu op de vertrekdag (of nog eens op de aankomstdag om te annuleren).`
+      ? `Aankomst ${fmt(state.pick)}. Klik nu op de vertrekdag, de dag dat je weggaat (of nog eens op de aankomstdag om te annuleren).`
       : 'Nieuwe reservatie: klik op een vrije dag voor de aankomst en daarna op de vertrekdag. Klik op een gekleurde dag om een reservatie te bekijken.');
 }
 

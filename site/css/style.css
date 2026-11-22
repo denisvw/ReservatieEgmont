@@ -223,3 +223,12 @@ details.help[open] { margin-bottom: .8rem; }
 
 /* Bij het springen naar de huidige maand niet onder de vaste bovenbalk verdwijnen */
 .mini-month { scroll-margin-top: 150px; }
+
+/* Aankomst- en vertrekdag half gekleurd (zoals in een hotelkalender) */
+.mini-day.arr { background: linear-gradient(135deg, transparent 50%, var(--c) 50%); color: var(--text); }
+.mini-day.dep { background: linear-gradient(135deg, var(--d) 50%, transparent 50%); color: var(--text); font-weight: 600; }
+.mini-day.dep.arr { background: linear-gradient(135deg, var(--d) 50%, var(--c) 50%); color: #fff; }
+.mini-day.school.arr { background: linear-gradient(135deg, var(--school) 50%, var(--c) 50%); }
+.mini-day.school.dep:not(.arr) { background: linear-gradient(135deg, var(--d) 50%, var(--school) 50%); }
+.mini-day.arr, .mini-day.dep:not(.arr) { text-shadow: 0 0 3px var(--card), 0 0 2px var(--card); }
+.mini-day.dep.arr { text-shadow: none; }
