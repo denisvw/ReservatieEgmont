@@ -14,6 +14,8 @@ const state = {
   people: new Map(), // id -> profiel (naam, partij)
   month: startOfMonth(new Date()),
   reservations: [],
+  holidays: [],
+  year: new Date().getFullYear(),
   lastMsgId: 0,
   unread: 0,
   editing: null,
@@ -113,6 +115,7 @@ async function boot() {
     return show('change-pw');
   }
   state.parties = await check(db.from('parties').select('*').order('sort'));
+  state.holidays = (await db.from('holidays').select('*').order('start_date')).data || [];
   await loadPeople();
   show('app');
   initApp();
@@ -188,7 +191,10 @@ function initApp() {
   // Live bijwerken; als reserve ook af en toe zelf kijken.
   db.channel('live')
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => loadMessages(false))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'reservations' }, () => loadMonth())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'reservations' }, () => {
+      loadMonth();
+      if (activeTab() === 'year') loadYear();
+    })
     .subscribe();
   setInterval(() => loadMessages(false), 30000);
   setInterval(loadMonth, 120000);
@@ -212,17 +218,28 @@ $('#tabs').addEventListener('click', (e) => {
     scrollChat();
   }
   if (b.dataset.tab === 'admin') loadUsers();
+  if (b.dataset.tab === 'year') loadYear();
 });
 const activeTab = () => $('#tabs button.active').dataset.tab;
 
 // ---------- Kalender ----------
-function renderLegend() {
-  $('#legend').replaceChildren(
+function legendItems() {
+  return [
     ...state.parties.map((p) =>
       el('span', { class: 'legend-item' }, el('span', { class: `swatch ${p.external ? 'ext' : ''}`, style: { background: p.color } }), p.external ? 'Externe verhuur' : p.label)
-    )
-  );
+    ),
+    el('span', { class: 'legend-item' }, el('span', { class: 'swatch school' }), 'Schoolvakantie'),
+    el('span', { class: 'legend-item' }, el('span', { class: 'swatch feest' }, '★'), 'Feestdag'),
+  ];
 }
+function renderLegend() {
+  $('#legend').replaceChildren(...legendItems());
+  $('#year-legend').replaceChildren(...legendItems());
+}
+
+// Verlofdagen op een datum (YYYY-MM-DD)
+const schoolHoliday = (ds) => state.holidays.find((h) => h.kind === 'school' && h.start_date <= ds && ds <= h.end_date);
+const feestdag = (ds) => state.holidays.find((h) => h.kind === 'feestdag' && h.start_date === ds);
 
 async function loadMonth() {
   const first = state.month;
@@ -251,8 +268,18 @@ function renderCalendar(gridStart) {
     const d = addDays(gridStart, i);
     const ds = iso(d);
     const inMonth = d.getMonth() === state.month.getMonth();
-    const cell = el('div', { class: `cal-day ${inMonth ? '' : 'other'} ${ds === today ? 'today' : ''} ${ds < today ? 'past' : ''}` });
-    cell.append(el('div', { class: 'num' }, String(d.getDate())));
+    const school = schoolHoliday(ds);
+    const feest = feestdag(ds);
+    const cell = el('div', {
+      class: `cal-day ${inMonth ? '' : 'other'} ${ds === today ? 'today' : ''} ${ds < today ? 'past' : ''} ${school ? 'school' : ''}`,
+    });
+    // Naam van de vakantie op de eerste dag en op elke maandag; feestdag altijd.
+    const holidayLabel = feest
+      ? el('span', { class: 'feest-label', title: feest.label }, `★ ${feest.label}`)
+      : school && (school.start_date === ds || d.getDay() === 1)
+        ? el('span', { class: 'school-label', title: school.label }, school.label)
+        : null;
+    cell.append(el('div', { class: 'num' }, String(d.getDate()), holidayLabel));
     for (const r of state.reservations) {
       const p = party(r.party);
       const occupies = r.start_date <= ds && ds < r.end_date;
@@ -385,6 +412,7 @@ $('#res-form').addEventListener('submit', async (e) => {
     else await check(db.from('reservations').insert(row).select().single());
     $('#res-dialog').close();
     loadMonth();
+    if (activeTab() === 'year') loadYear();
     loadMessages(false);
   } catch (err) {
     showError(f, err.message);
@@ -397,6 +425,7 @@ $('#res-delete').addEventListener('click', async () => {
     await check(db.from('reservations').delete().eq('id', state.editing.id));
     $('#res-dialog').close();
     loadMonth();
+    if (activeTab() === 'year') loadYear();
     loadMessages(false);
   } catch (err) {
     showError($('#res-form'), err.message);
@@ -668,6 +697,115 @@ $('#wa-test').addEventListener('click', async () => {
   } catch (err) {
     out.textContent = err.message;
   }
+});
+
+// ---------- Jaaroverzicht ----------
+async function loadYear() {
+  const y = state.year;
+  $('#year-title').textContent = String(y);
+  try {
+    const list = await check(
+      db.from('reservations').select('*').lt('start_date', `${y + 1}-01-01`).gt('end_date', `${y}-01-01`).order('start_date')
+    );
+    renderYear(y, list);
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+function renderYear(y, list) {
+  const today = iso(new Date());
+  const months = [];
+  for (let m = 0; m < 12; m++) {
+    const first = new Date(y, m, 1);
+    const name = first.toLocaleDateString('nl-BE', { month: 'long' });
+    const grid = el('div', { class: 'mini-grid' }, ...['m', 'd', 'w', 'd', 'v', 'z', 'z'].map((d) => el('div', { class: 'mini-dow' }, d)));
+    for (let i = 0; i < (first.getDay() + 6) % 7; i++) grid.append(el('div'));
+    for (let d = first; d.getMonth() === m; d = addDays(d, 1)) {
+      const ds = iso(d);
+      const r = list.find((x) => x.start_date <= ds && ds < x.end_date);
+      const p = r ? party(r.party) : null;
+      const school = schoolHoliday(ds);
+      const feest = feestdag(ds);
+      const title = [fmt(ds), p ? (p.external ? 'Externe verhuur' : p.label) : null, school?.label, feest ? `★ ${feest.label}` : null]
+        .filter(Boolean)
+        .join('\n');
+      grid.append(
+        el(
+          'button',
+          {
+            class: ['mini-day', p ? 'busy' : '', p?.external ? 'ext' : '', school ? 'school' : '', feest ? 'feest' : '', ds === today ? 'today' : '', ds < today ? 'past' : '']
+              .join(' '),
+            style: p ? { '--c': p.color } : {},
+            title,
+            onclick: () => (r ? openReservation(r) : ds >= today ? openReservation(null, ds) : null),
+          },
+          String(d.getDate())
+        )
+      );
+    }
+    months.push(
+      el(
+        'div',
+        { class: 'mini-month' },
+        el(
+          'button',
+          {
+            class: 'mini-title link',
+            onclick: () => {
+              state.month = new Date(y, m, 1);
+              $('#tabs button[data-tab=calendar]').click();
+              loadMonth();
+            },
+          },
+          name[0].toUpperCase() + name.slice(1)
+        ),
+        grid
+      )
+    );
+  }
+  $('#year-grid').replaceChildren(...months);
+
+  // Nachten per partij in dit jaar (enkel de nachten binnen het jaar tellen)
+  const yStart = `${y}-01-01`;
+  const yEnd = `${y + 1}-01-01`;
+  const totals = new Map();
+  for (const r of list) {
+    const a = r.start_date > yStart ? r.start_date : yStart;
+    const b = r.end_date < yEnd ? r.end_date : yEnd;
+    const t = totals.get(r.party) || { nights: 0, count: 0 };
+    t.nights += nights(a, b);
+    t.count += 1;
+    totals.set(r.party, t);
+  }
+  const daysInYear = nights(yStart, yEnd);
+  const free = daysInYear - [...totals.values()].reduce((n, t) => n + t.nights, 0);
+  $('#year-totals tbody').replaceChildren(
+    ...state.parties.map((p) => {
+      const t = totals.get(p.key) || { nights: 0, count: 0 };
+      return el(
+        'tr',
+        {},
+        el('td', {}, el('span', { class: `swatch ${p.external ? 'ext' : ''}`, style: { background: p.color } }), ' ', p.external ? 'Externe verhuur' : p.label),
+        el('td', { class: 'num-col' }, String(t.count)),
+        el('td', { class: 'num-col' }, String(t.nights))
+      );
+    }),
+    el('tr', { class: 'muted' }, el('td', {}, 'Vrij'), el('td', {}, ''), el('td', { class: 'num-col' }, String(free)))
+  );
+}
+
+$('#year-prev').addEventListener('click', () => {
+  state.year -= 1;
+  loadYear();
+});
+$('#year-next').addEventListener('click', () => {
+  state.year += 1;
+  loadYear();
+});
+$('#year-today').addEventListener('click', () => {
+  state.year = new Date().getFullYear();
+  loadYear();
 });
 
 boot();

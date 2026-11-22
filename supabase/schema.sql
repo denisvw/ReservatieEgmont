@@ -259,3 +259,65 @@ exception when duplicate_object then null; end $$;
 do $$ begin
   alter publication supabase_realtime add table public.messages;
 exception when duplicate_object then null; end $$;
+
+-- ============================================================
+-- Verlofdagen: Vlaamse schoolvakanties en wettelijke feestdagen
+-- ============================================================
+create table if not exists public.holidays (
+  id         bigint generated always as identity primary key,
+  kind       text not null check (kind in ('school', 'feestdag')),
+  label      text not null,
+  start_date date not null,
+  end_date   date not null,               -- laatste dag (inclusief)
+  check (end_date >= start_date),
+  unique (kind, start_date)
+);
+
+alter table public.holidays enable row level security;
+drop policy if exists "leden zien verlofdagen" on public.holidays;
+create policy "leden zien verlofdagen" on public.holidays for select to authenticated using (public.is_member());
+drop policy if exists "beheerder beheert verlofdagen" on public.holidays;
+create policy "beheerder beheert verlofdagen" on public.holidays for all to authenticated
+  using (public.is_admin()) with check (public.is_admin());
+
+-- Data toevoegen of verbeteren: pas deze lijst aan en voer het script opnieuw uit.
+-- Schoolvakanties 2026-2027 nagekeken; 2027-2028 berekend volgens de vaste
+-- Vlaamse regels (nog na te kijken op onderwijs.vlaanderen.be zodra gepubliceerd).
+insert into public.holidays (kind, label, start_date, end_date) values
+  ('school',   'Kerstvakantie',            '2026-12-21', '2027-01-03'),
+  ('school',   'Krokusvakantie',           '2027-02-08', '2027-02-14'),
+  ('school',   'Paasvakantie',             '2027-03-29', '2027-04-11'),
+  ('school',   'Zomervakantie',            '2027-07-01', '2027-08-31'),
+  ('school',   'Herfstvakantie',           '2027-11-01', '2027-11-07'),
+  ('school',   'Kerstvakantie (voorlopig)', '2027-12-27', '2028-01-09'),
+  ('school',   'Krokusvakantie (voorlopig)', '2028-02-28', '2028-03-05'),
+  ('school',   'Paasvakantie (voorlopig)', '2028-04-03', '2028-04-16'),
+  ('school',   'Zomervakantie',            '2028-07-01', '2028-08-31'),
+  ('feestdag', 'Kerstmis',                 '2026-12-25', '2026-12-25'),
+  ('feestdag', 'Nieuwjaar',                '2027-01-01', '2027-01-01'),
+  ('feestdag', 'Pasen',                    '2027-03-28', '2027-03-28'),
+  ('feestdag', 'Paasmaandag',              '2027-03-29', '2027-03-29'),
+  ('feestdag', 'Dag van de Arbeid',        '2027-05-01', '2027-05-01'),
+  ('feestdag', 'O.L.H. Hemelvaart',        '2027-05-06', '2027-05-06'),
+  ('feestdag', 'Pinksteren',               '2027-05-16', '2027-05-16'),
+  ('feestdag', 'Pinkstermaandag',          '2027-05-17', '2027-05-17'),
+  ('feestdag', 'Feest van de Vlaamse Gemeenschap', '2027-07-11', '2027-07-11'),
+  ('feestdag', 'Nationale feestdag',       '2027-07-21', '2027-07-21'),
+  ('feestdag', 'O.L.V. Hemelvaart',        '2027-08-15', '2027-08-15'),
+  ('feestdag', 'Allerheiligen',            '2027-11-01', '2027-11-01'),
+  ('feestdag', 'Wapenstilstand',           '2027-11-11', '2027-11-11'),
+  ('feestdag', 'Kerstmis',                 '2027-12-25', '2027-12-25'),
+  ('feestdag', 'Nieuwjaar',                '2028-01-01', '2028-01-01'),
+  ('feestdag', 'Pasen',                    '2028-04-16', '2028-04-16'),
+  ('feestdag', 'Paasmaandag',              '2028-04-17', '2028-04-17'),
+  ('feestdag', 'Dag van de Arbeid',        '2028-05-01', '2028-05-01'),
+  ('feestdag', 'O.L.H. Hemelvaart',        '2028-05-25', '2028-05-25'),
+  ('feestdag', 'Pinksteren',               '2028-06-04', '2028-06-04'),
+  ('feestdag', 'Pinkstermaandag',          '2028-06-05', '2028-06-05'),
+  ('feestdag', 'Feest van de Vlaamse Gemeenschap', '2028-07-11', '2028-07-11'),
+  ('feestdag', 'Nationale feestdag',       '2028-07-21', '2028-07-21'),
+  ('feestdag', 'O.L.V. Hemelvaart',        '2028-08-15', '2028-08-15'),
+  ('feestdag', 'Allerheiligen',            '2028-11-01', '2028-11-01'),
+  ('feestdag', 'Wapenstilstand',           '2028-11-11', '2028-11-11'),
+  ('feestdag', 'Kerstmis',                 '2028-12-25', '2028-12-25')
+on conflict (kind, start_date) do update set label = excluded.label, end_date = excluded.end_date;

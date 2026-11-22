@@ -9,6 +9,10 @@
   --danger: #b42318;
   --today: #fff7d6;
   --ext-stripe: rgba(255, 255, 255, 0.18);
+  --school: #eaf4fb;
+  --school-line: #b9d9ee;
+  --school-text: #2f6f96;
+  --feest: #c2410c;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
@@ -22,6 +26,10 @@
     --accent-text: #0b1418;
     --danger: #f97066;
     --today: #3a3319;
+    --school: #16283a;
+    --school-line: #2b4a66;
+    --school-text: #8fc3e6;
+    --feest: #fb923c;
     color-scheme: dark;
   }
 }
@@ -174,3 +182,34 @@ fieldset.notify legend { font-size: .85rem; color: var(--muted); padding: 0 .3re
 details.help > label, details.help > div { margin-left: 0; }
 details.help[open] { margin-bottom: .8rem; }
 #mail-test + #wa-test { margin-left: .4rem; }
+
+/* Verlofdagen */
+.swatch.school { background: var(--school); border: 1px solid var(--school-line); }
+.swatch.feest { background: none; color: var(--feest); font-size: .8rem; line-height: 14px; text-align: center; }
+.cal-day.school { background: var(--school); }
+.cal-day.school.today { background: var(--today); }
+.cal-day .num { display: flex; gap: .35rem; align-items: baseline; min-width: 0; }
+.school-label, .feest-label { font-size: .65rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.school-label { color: var(--school-text); }
+.feest-label { color: var(--feest); font-weight: 600; }
+
+/* Jaaroverzicht */
+.year-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 1rem; }
+.mini-month { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: .7rem; }
+.mini-title { font-weight: 700; margin-bottom: .4rem; display: block; color: var(--text); }
+.mini-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.mini-dow { font-size: .65rem; color: var(--muted); text-align: center; text-transform: uppercase; }
+.mini-day {
+  aspect-ratio: 1; padding: 0; border: 0; border-radius: 4px; font-size: .7rem;
+  background: transparent; color: var(--text); position: relative;
+}
+.mini-day.school { background: var(--school); }
+.mini-day.busy { background: var(--c); color: #fff; font-weight: 600; }
+.mini-day.busy.ext { background-image: repeating-linear-gradient(45deg, var(--ext-stripe) 0 3px, transparent 3px 6px); }
+.mini-day.feest::after { content: '★'; position: absolute; top: -3px; right: 0; font-size: .55rem; color: var(--feest); }
+.mini-day.busy.feest::after { color: #fff; }
+.mini-day.today { outline: 2px solid var(--accent); outline-offset: -1px; }
+.mini-day.past { opacity: .55; }
+.mini-day:hover { outline: 2px solid var(--accent); outline-offset: -1px; }
+.narrow-table { max-width: 480px; }
+.num-col { text-align: right; }

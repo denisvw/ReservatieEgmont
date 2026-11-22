@@ -25,8 +25,9 @@ ReservatieEgmont/
   - Een familielid reserveert, wijzigt of annuleert alleen voor de eigen partij.
   - Alleen de beheerder geeft externe verhuur in.
   - Twee reservaties kunnen nooit overlappen. De vertrekdag mag wel de aankomstdag van de volgende zijn.
-- **Meldingen per e-mail**: elke nieuwe, gewijzigde of geannuleerde reservatie komt in de chat en gaat per mail naar alle anderen. Niemand moet daarvoor iets instellen. Wie ook bij elk chatbericht een mail wil, of helemaal geen mail, kiest dat zelf op **Profiel**. WhatsApp via CallMeBot kan er optioneel bij.
+- **Meldingen per e-mail**: elke nieuwe, gewijzigde of geannuleerde reservatie komt in de chat en gaat per mail naar alle anderen, met onderaan een overzicht van alle reservaties voor de komende 12 maanden. Niemand moet daarvoor iets instellen. Wie ook bij elk chatbericht een mail wil, of helemaal geen mail, kiest dat zelf op **Profiel**. WhatsApp via CallMeBot kan er optioneel bij.
 - **Chat** om berichten te delen met de hele familie.
+- **Jaaroverzicht**: alle maanden van een jaar in één oogopslag, met verlofdagen en het aantal nachten per partij.
 - **Beheer**: gebruikers aanmaken, aan een partij koppelen, beheerder maken, (de)activeren, een nieuw tijdelijk paswoord geven of verwijderen, en een testmail sturen.
 
 ---
@@ -174,6 +175,10 @@ Geen enkele officiële WhatsApp-dienst laat toe te posten in een bestaande **gro
 | `meta` | gratis tot ± 1000 gesprekken/maand | Officiële WhatsApp Cloud API. Je hebt een Meta Business-account, een apart nummer en een goedgekeurde template met één parameter nodig. Extra secrets: `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_TEMPLATE`. |
 
 Test met de knop **Testbericht versturen** in Beheer.
+
+## Verlofdagen aanpassen
+
+De kalender en het jaaroverzicht tonen de Vlaamse schoolvakanties (lichtblauw) en de wettelijke feestdagen (★). De data staan onderaan in `supabase/schema.sql`, bij `insert into public.holidays`. Schooljaar 2026–2027 is nagekeken. Wat als *(voorlopig)* gemarkeerd staat, is berekend volgens de vaste regels en moet je nakijken zodra Vlaanderen de officiële kalender publiceert. Een jaar toevoegen of iets verbeteren: pas de lijst aan en voer het hele script opnieuw uit in de SQL Editor.
 
 ## Een partij toevoegen of hernoemen
 

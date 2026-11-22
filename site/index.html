@@ -41,6 +41,7 @@
       <div class="brand">🏖️ <span>Appartement aan zee</span></div>
       <nav id="tabs">
         <button data-tab="calendar" class="active">Kalender</button>
+        <button data-tab="year">Jaaroverzicht</button>
         <button data-tab="chat">Chat <span id="chat-badge" class="badge" hidden></span></button>
         <button data-tab="profile">Profiel</button>
         <button data-tab="admin" id="tab-admin" hidden>Beheer</button>
@@ -63,6 +64,25 @@
         <div class="cal-grid" id="cal-grid"></div>
         <h3>Komende periodes</h3>
         <ul id="upcoming" class="upcoming"></ul>
+      </section>
+
+      <!-- Jaaroverzicht -->
+      <section id="tab-year" class="tab" hidden>
+        <div class="cal-head">
+          <button id="year-prev" aria-label="Vorig jaar">‹</button>
+          <h2 id="year-title"></h2>
+          <button id="year-next" aria-label="Volgend jaar">›</button>
+          <button id="year-today" class="ghost">Dit jaar</button>
+        </div>
+        <div id="year-legend" class="legend"></div>
+        <div id="year-grid" class="year-grid"></div>
+        <h3>Nachten per partij</h3>
+        <div class="card table-wrap narrow-table">
+          <table id="year-totals">
+            <thead><tr><th>Partij</th><th class="num-col">Reservaties</th><th class="num-col">Nachten</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
       </section>
 
       <!-- Chat -->

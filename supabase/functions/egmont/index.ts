@@ -107,22 +107,23 @@ async function broadcast(text: string, excludeId: string | null) {
 const esc = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 
-function mailHtml(text: string) {
+function mailHtml(text: string, extraHtml = "") {
   const site = env("SITE_URL").replace(/\/$/, "");
   return `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:15px;line-height:1.5;color:#1f2a33">
-    <p style="white-space:pre-line;margin:0 0 16px">${esc(text)}</p>
+    <p style="white-space:pre-line;margin:0 0 16px">${esc(text)}</p>${extraHtml}
     ${site ? `<p><a href="${site}" style="display:inline-block;background:#0e7490;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none">Open de kalender</a></p>` : ""}
     <p style="color:#6b7a86;font-size:12px;margin-top:24px">Je krijgt deze mail van de reservatiesite van het appartement aan zee.
     Welke mails je krijgt, kies je zelf op de pagina Profiel.</p></div>`;
 }
 
-async function sendMails(to: string[], subject: string, text: string) {
+async function sendMails(to: string[], subject: string, text: string, extra?: { html: string; text: string }) {
   if (!to.length) return 0;
   if (!env("RESEND_API_KEY") || !env("MAIL_FROM")) {
     console.log(`[mail] RESEND_API_KEY/MAIL_FROM ontbreken; niet verstuurd naar ${to.length} ontvanger(s): ${subject}`);
     return 0;
   }
-  const html = mailHtml(text);
+  const html = mailHtml(text, extra?.html ?? "");
+  if (extra) text = `${text}\n\n${extra.text}`;
   // Eén mail per persoon (niemand ziet de andere adressen); per 100 via de batch-API.
   let sent = 0;
   for (let i = 0; i < to.length; i += 100) {
@@ -138,6 +139,42 @@ async function sendMails(to: string[], subject: string, text: string) {
   return sent;
 }
 
+// Overzicht van alle reservaties voor de komende 12 maanden, voor in de mail.
+async function yearOverview() {
+  const today = new Date();
+  const from = today.toISOString().slice(0, 10);
+  const until = new Date(today.getTime() + 365 * 86400000).toISOString().slice(0, 10);
+  const [{ data: res }, { data: parties }] = await Promise.all([
+    admin.from("reservations").select("party, start_date, end_date, note")
+      .gt("end_date", from).lt("start_date", until).order("start_date"),
+    admin.from("parties").select("key, label, color, external"),
+  ]);
+  type Party = { key: string; label: string; color: string; external: boolean };
+  const pmap = new Map<string, Party>(((parties ?? []) as Party[]).map((p) => [p.key, p]));
+  const dfmt = (s: string) =>
+    new Date(s + "T12:00:00Z").toLocaleDateString("nl-BE", { weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+  const n = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
+  const rows = (res ?? []).map((r) => {
+    const p = pmap.get(r.party) ?? { label: r.party, color: "#999", external: false };
+    return { label: p.external ? "Externe verhuur" : p.label, color: p.color, ext: p.external, ...r, nights: n(r.start_date, r.end_date) };
+  });
+  const title = "Overzicht komende 12 maanden";
+  if (!rows.length) {
+    return { text: `${title}: nog niets gereserveerd.`, html: `<h3 style="font-size:15px;margin:24px 0 8px">${title}</h3><p>Nog niets gereserveerd.</p>` };
+  }
+  const text = `${title}:\n` +
+    rows.map((r) => `- ${r.label}: ${dfmt(r.start_date)} → ${dfmt(r.end_date)} (${r.nights} n.)`).join("\n");
+  const html = `<h3 style="font-size:15px;margin:24px 0 8px">${title}</h3>
+    <table cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:14px">
+    ${rows.map((r) => `<tr>
+      <td style="padding:4px 8px 4px 0;vertical-align:top"><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:${r.color};${r.ext ? "outline:2px dashed #999;outline-offset:-2px;" : ""}"></span></td>
+      <td style="padding:4px 12px 4px 0;vertical-align:top;font-weight:600;white-space:nowrap">${esc(r.label)}</td>
+      <td style="padding:4px 12px 4px 0;vertical-align:top;white-space:nowrap">${esc(dfmt(r.start_date))} → ${esc(dfmt(r.end_date))}</td>
+      <td style="padding:4px 0;vertical-align:top;color:#6b7a86;white-space:nowrap">${r.nights} n.</td></tr>`).join("")}
+    </table>`;
+  return { text, html };
+}
+
 async function mailEveryone(text: string, isChat: boolean, excludeId: string | null) {
   const { data, error } = await admin
     .from("profiles")
@@ -150,7 +187,8 @@ async function mailEveryone(text: string, isChat: boolean, excludeId: string | n
   const lines = text.split("\n").map((l) => l.replace(/^\p{Extended_Pictographic}\uFE0F?\s*/u, ""));
   const detail = (lines.find((l) => l.startsWith("Nu: ")) ?? lines[1] ?? "").replace(/^Nu: /, "").replace(/ \(\d+ nachten\)$/, "");
   const subject = (isChat ? `Bericht van ${lines[0]}` : detail ? `${lines[0]} – ${detail}` : lines[0]).slice(0, 140);
-  return sendMails(to, subject, text);
+  if (!to.length) return 0;
+  return sendMails(to, subject, text, isChat ? undefined : await yearOverview());
 }
 
 async function handleWebhook(payload: {
