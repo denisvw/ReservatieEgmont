@@ -220,3 +220,6 @@ details.help[open] { margin-bottom: .8rem; }
 .mini-day.picked, .mini-day.in-range { background: var(--accent); color: var(--accent-text); font-weight: 700; opacity: 1; }
 .mini-day.in-range { opacity: .75; }
 .mini-day.in-range.bad { background: var(--danger); color: #fff; }
+
+/* Bij het springen naar de huidige maand niet onder de vaste bovenbalk verdwijnen */
+.mini-month { scroll-margin-top: 150px; }

@@ -40,8 +40,9 @@
     <header class="topbar">
       <div class="brand">🏖️ <span>Appartement aan zee</span></div>
       <nav id="tabs">
-        <button data-tab="calendar" class="active">Kalender</button>
-        <button data-tab="year">Jaaroverzicht</button>
+        <!-- Maandkalender verborgen: alles gebeurt via het jaaroverzicht. Weghalen van "hidden" zet ze terug. -->
+        <button data-tab="calendar" hidden>Kalender</button>
+        <button data-tab="year" class="active">Kalender</button>
         <button data-tab="chat">Chat <span id="chat-badge" class="badge" hidden></span></button>
         <button data-tab="profile">Profiel</button>
         <button data-tab="admin" id="tab-admin" hidden>Beheer</button>
@@ -51,7 +52,7 @@
 
     <main>
       <!-- Kalender -->
-      <section id="tab-calendar" class="tab">
+      <section id="tab-calendar" class="tab" hidden>
         <div class="cal-head">
           <button id="cal-prev" aria-label="Vorige maand">‹</button>
           <h2 id="cal-title"></h2>
@@ -62,12 +63,10 @@
         </div>
         <div id="legend" class="legend"></div>
         <div class="cal-grid" id="cal-grid"></div>
-        <h3>Komende periodes</h3>
-        <ul id="upcoming" class="upcoming"></ul>
       </section>
 
       <!-- Jaaroverzicht -->
-      <section id="tab-year" class="tab" hidden>
+      <section id="tab-year" class="tab">
         <div class="cal-head">
           <button id="year-prev" aria-label="Vorig jaar">‹</button>
           <h2 id="year-title"></h2>
@@ -79,6 +78,8 @@
         <div id="year-legend" class="legend"></div>
         <p id="year-hint" class="year-hint"></p>
         <div id="year-grid" class="year-grid"></div>
+        <h3>Komende periodes</h3>
+        <ul id="upcoming" class="upcoming"></ul>
         <h3>Nachten per partij</h3>
         <div class="card table-wrap narrow-table">
           <table id="year-totals">

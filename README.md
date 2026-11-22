@@ -27,7 +27,7 @@ ReservatieEgmont/
   - Twee reservaties kunnen nooit overlappen. De vertrekdag mag wel de aankomstdag van de volgende zijn.
 - **Meldingen per e-mail**: elke nieuwe, gewijzigde of geannuleerde reservatie komt in de chat en gaat per mail naar alle anderen, met onderaan een overzicht van alle reservaties voor de komende 12 maanden. Niemand moet daarvoor iets instellen. Wie ook bij elk chatbericht een mail wil, of helemaal geen mail, kiest dat zelf op **Profiel**. WhatsApp via CallMeBot kan er optioneel bij.
 - **Chat** om berichten te delen met de hele familie.
-- **Jaaroverzicht**: alle maanden van een jaar in één oogopslag, met verlofdagen en het aantal nachten per partij.
+- **Kalender (jaaroverzicht)**: alle maanden van een jaar in één oogopslag, met verlofdagen, de komende periodes en het aantal nachten per partij. Je reserveert door de aankomst- en vertrekdag aan te klikken. De oude maandkalender staat verborgen in `site/index.html` en komt terug door daar `hidden` weg te halen.
 - **Beheer**: gebruikers aanmaken, aan een partij koppelen, beheerder maken, (de)activeren, een nieuw tijdelijk paswoord geven of verwijderen, en een testmail sturen.
 
 ---

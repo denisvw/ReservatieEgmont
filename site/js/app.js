@@ -189,6 +189,7 @@ function initApp() {
   if (appInitialized) return;
   appInitialized = true;
   loadMonth();
+  loadYear();
   loadMessages(true);
   // Live bijwerken; als reserve ook af en toe zelf kijken.
   db.channel('live')
@@ -754,23 +755,17 @@ function renderYear(y, list) {
       el(
         'div',
         { class: 'mini-month' },
-        el(
-          'button',
-          {
-            class: 'mini-title link',
-            onclick: () => {
-              state.month = new Date(y, m, 1);
-              $('#tabs button[data-tab=calendar]').click();
-              loadMonth();
-            },
-          },
-          name[0].toUpperCase() + name.slice(1)
-        ),
+        el('div', { class: 'mini-title' }, name[0].toUpperCase() + name.slice(1)),
         grid
       )
     );
   }
   $('#year-grid').replaceChildren(...months);
+  // Op gsm staan de maanden onder elkaar: spring bij het openen naar de huidige maand.
+  if (!state.yearScrolled && y === new Date().getFullYear() && window.innerWidth < 700) {
+    state.yearScrolled = true;
+    months[new Date().getMonth()].scrollIntoView({ block: 'start' });
+  }
 
   // Nachten per partij in dit jaar (enkel de nachten binnen het jaar tellen)
   const yStart = `${y}-01-01`;
