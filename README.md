@@ -36,20 +36,28 @@ Totaal ±1,5 uur. Een pas gekocht domein heeft soms een paar uur nodig voor het 
 
 De site komt op **`https://zee.vanwaet.be`**. Zo blijft `vanwaet.be` zelf vrij voor later, bv. een familiesite of e-mailadressen. Wil je toch de site op `vanwaet.be` zelf, zie de opmerking bij stap 4.
 
-**Wat je nodig hebt:** je GitHub-account en je Netlify-account (dezelfde als voor Gilles' world), een bankkaart voor het domein (±€10–15/jaar) en ongeveer een halfuur voor elk familielid om in te loggen en WhatsApp te koppelen.
+**Wat je nodig hebt:** je GitHub- en Netlify-account (dezelfde als voor Gilles' world), je Combell-account met het domein `vanwaet.be`, en ongeveer een halfuur voor elk familielid om in te loggen en WhatsApp te koppelen.
 
-Je koopt het domein via **Netlify**, net als `gilles-world.com`. Netlify regelt dan ook het DNS-beheer, dus alles staat op één plaats.
+Het domein staat bij **Combell**, maar het DNS-beheer doet **Netlify**. Zo werkt alles verder zoals bij Gilles' world: de site, het certificaat en de mailrecords regel je in Netlify. Combell stuurt je enkel nog de jaarlijkse factuur.
 
-### Stap 1: de domeinnaam `vanwaet.be` kopen via Netlify (±10 min)
+### Stap 1: het domein `vanwaet.be` van Combell naar Netlify DNS laten wijzen (±10 min, daarna wachten)
 
-1. Log in op **app.netlify.com**. Klik links in het menu van je team op **Domains → Add or register domain** (of *Buy a domain*).
-2. Typ `vanwaet.be` en klik *Verify* / *Check availability*.
-   - **Beschikbaar met een prijs:** ga verder, vul je gegevens in en betaal. Zet **Auto-renew** aan.
-   - **Al in gebruik:** kies een andere naam, bv. `familievanwaet.be`, en pas die overal in dit stappenplan aan.
-   - **Netlify verkoopt geen `.be`:** zie het kader *Lukt `.be` niet via Netlify?* hieronder.
-3. Na de aankoop staat `vanwaet.be` onder **Domains**, met DNS-beheer bij Netlify. Je zet daar in stap 5 een paar records voor de mail. Het kan tot een paar uur duren voor een nieuw domein overal werkt.
+**1a. Het domein toevoegen in Netlify**
 
-> **Lukt `.be` niet via Netlify?** Koop het domein dan bij een Belgische registrar (bv. Combell, one.com of OVH), enkel de domeinnaam zonder hosting. Voeg daarna in Netlify bij **Domains → Add or register domain** `vanwaet.be` toe als *bestaand domein* en kies **Set up Netlify DNS**. Netlify toont vier *nameservers* (`dns1.p0x.nsone.net` …). Vul die bij je registrar in onder *Nameservers / DNS-servers*. Vanaf dan beheer je alles in Netlify en werken stap 4 en 5 precies zoals hieronder.
+1. Log in op **app.netlify.com**, in hetzelfde team als Gilles' world. Klik links op **Domains → Add or register domain**.
+2. Typ `vanwaet.be` en klik *Verify*. Netlify ziet dat het domein al bestaat. Bevestig dat het van jou is (*Add domain* / *Yes, add domain*).
+3. Kies **Set up Netlify DNS** en klik door. Records die Netlify voorstelt, mag je overslaan: er staat nog niets op het domein.
+4. Op het laatste scherm toont Netlify **vier nameservers**, bv. `dns1.p05.nsone.net` tot `dns4.p05.nsone.net`. Laat dat scherm open of noteer ze. Je vindt ze later ook terug bij **Domains → vanwaet.be → DNS settings**.
+
+**1b. De nameservers invullen bij Combell**
+
+1. Log in op **my.combell.com** en open bij je producten het domein `vanwaet.be`.
+2. Staat **DNSSEC** aan, zet het dan eerst **uit**. Met DNSSEC aan kan de overstap naar Netlify mislukken.
+3. Kies **Naamservers** (ook *Nameservers* of *DNS-servers wijzigen*) → **Eigen/aangepaste naamservers**.
+4. Vervang de naamservers van Combell door de vier van Netlify, één per regel, en bewaar.
+5. Wacht. Na enkele minuten tot hoogstens een paar uur staat in Netlify bij **Domains → vanwaet.be** dat Netlify DNS actief is. Doe intussen gerust stap 2 en 3.
+
+> Combell kan waarschuwen dat de DNS-instellingen bij Combell niet meer gebruikt worden. Dat klopt en is de bedoeling: vanaf nu wijzig je DNS-records enkel nog in Netlify.
 
 ### Stap 2: Supabase (±15 min)
 
@@ -68,7 +76,7 @@ Je koopt het domein via **Netlify**, net als `gilles-world.com`. Netlify regelt 
 
 ### Stap 3: de website op Netlify (±10 min)
 
-1. Op **netlify.com** (inloggen met GitHub): *Add new project → Import an existing project → GitHub* en kies `ReservatieEgmont`. Geef Netlify toegang tot die repository.
+1. Maak een **nieuw project** in Netlify, in hetzelfde team als Gilles' world. Gilles' world blijft zijn eigen project. Kies op **app.netlify.com** *Add new project → Import an existing project → GitHub* en kies `ReservatieEgmont`. Vraagt Netlify toegang, voeg dan die repository toe aan de GitHub-koppeling.
 2. **Branch to deploy**: `main`.
 3. **Publish directory**: `site`. Laat *Build command* leeg.
 4. Klik *Deploy*. Onder *Project configuration → Change project name* noem je hem `appartement-zee`. Je krijgt dan het adres `https://appartement-zee.netlify.app`.
@@ -173,4 +181,4 @@ Pas in `supabase/schema.sql` de lijst bij `insert into public.parties` aan en vo
 
 - Supabase: gratis (aparte gratis organisatie)
 - Netlify en Resend: gratis
-- Domein `vanwaet.be` via Netlify: ±10–15 euro per jaar
+- Domein `vanwaet.be` bij Combell: zie je Combell-factuur (±10–15 euro per jaar). Netlify DNS is gratis.
