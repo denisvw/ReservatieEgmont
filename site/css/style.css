@@ -168,3 +168,9 @@ dialog::backdrop { background: rgba(0,0,0,.4); }
   .who { width: 100%; justify-content: space-between; margin-left: 0; }
   .row { flex-direction: column; gap: 0; }
 }
+
+fieldset.notify { border: 1px solid var(--line); border-radius: 8px; padding: .4rem .8rem; margin: .8rem 0; }
+fieldset.notify legend { font-size: .85rem; color: var(--muted); padding: 0 .3rem; }
+details.help > label, details.help > div { margin-left: 0; }
+details.help[open] { margin-bottom: .8rem; }
+#mail-test + #wa-test { margin-left: .4rem; }

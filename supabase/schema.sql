@@ -45,6 +45,10 @@ create table if not exists public.profiles (
   created_at           timestamptz not null default now()
 );
 
+-- E-mailmeldingen (toegevoegd na de eerste versie; veilig om opnieuw uit te voeren)
+alter table public.profiles add column if not exists notify_email_reservations boolean not null default true;
+alter table public.profiles add column if not exists notify_email_chat boolean not null default false;
+
 -- Persoonlijke CallMeBot-sleutel: enkel leesbaar voor de eigenaar zelf.
 create table if not exists public.whatsapp_keys (
   user_id       uuid primary key references public.profiles(id) on delete cascade,

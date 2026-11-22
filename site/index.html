@@ -70,7 +70,7 @@
         <div class="chat">
           <div id="chat-log" class="chat-log"></div>
           <form id="chat-form" class="chat-form">
-            <textarea name="body" rows="2" placeholder="Schrijf een bericht… (wordt ook via WhatsApp gedeeld)" maxlength="2000" required></textarea>
+            <textarea name="body" rows="2" placeholder="Schrijf een bericht…" maxlength="2000" required></textarea>
             <button type="submit" class="primary">Verstuur</button>
           </form>
         </div>
@@ -83,21 +83,25 @@
             <h2>Mijn gegevens</h2>
             <p class="muted" id="profile-party"></p>
             <label>Naam <input name="name" required maxlength="80"></label>
-            <label>GSM-nummer (WhatsApp) <input name="phone" placeholder="+32470123456"></label>
-            <label class="check"><input type="checkbox" name="notify_whatsapp"> WhatsApp-meldingen ontvangen</label>
-            <div id="callmebot-block">
-              <p class="small muted">Alleen nodig als de beheerder WhatsApp via CallMeBot instelde.</p>
-              <label>CallMeBot API-sleutel <input name="callmebot_key" autocomplete="off" placeholder="laat leeg om te behouden"></label>
-              <details class="help">
-                <summary>Hoe krijg ik een CallMeBot-sleutel?</summary>
-                <ol>
-                  <li>Voeg het nummer <b>+34 644 51 95 23</b> toe aan je contacten (bv. "CallMeBot").</li>
+            <fieldset class="notify">
+              <legend>E-mailmeldingen naar <b id="profile-email"></b></legend>
+              <label class="check"><input type="checkbox" name="notify_email_reservations"> Bij elke nieuwe, gewijzigde of geannuleerde reservatie</label>
+              <label class="check"><input type="checkbox" name="notify_email_chat"> Bij elk chatbericht</label>
+            </fieldset>
+            <details class="help">
+              <summary>WhatsApp-meldingen (optioneel)</summary>
+              <label>GSM-nummer <input name="phone" placeholder="+32470123456"></label>
+              <label class="check"><input type="checkbox" name="notify_whatsapp"> WhatsApp-meldingen ontvangen</label>
+              <div id="callmebot-block">
+                <p class="small muted">Werkt alleen als de beheerder WhatsApp via CallMeBot instelde.</p>
+                <label>CallMeBot API-sleutel <input name="callmebot_key" autocomplete="off" placeholder="laat leeg om te behouden"></label>
+                <ol class="small muted">
+                  <li>Ga op callmebot.com naar <i>Free WhatsApp API → Send Messages</i> en voeg het nummer dat daar staat toe aan je contacten.</li>
                   <li>Stuur via WhatsApp het bericht <code>I allow callmebot to send me messages</code> naar dat contact.</li>
-                  <li>Je krijgt een antwoord met je persoonlijke API-sleutel. Plak die hierboven.</li>
+                  <li>Plak de API-sleutel uit het antwoord hierboven. Typ <code>-</code> om ze te wissen.</li>
                 </ol>
-                <p class="small muted">Typ <code>-</code> om de sleutel te wissen. (Controleer het actuele nummer op callmebot.com.)</p>
-              </details>
-            </div>
+              </div>
+            </details>
             <p class="error"></p>
             <button class="primary">Opslaan</button>
           </form>
@@ -120,23 +124,23 @@
             <label>Naam <input name="name" required></label>
             <label>E-mailadres <input type="email" name="email" required></label>
             <label>Partij <select name="party" class="party-select-family"></select></label>
-            <label>GSM-nummer (optioneel) <input name="phone" placeholder="+32470123456"></label>
             <label class="check"><input type="checkbox" name="is_admin"> Beheerder</label>
             <p class="error"></p>
             <button class="primary">Gebruiker aanmaken</button>
             <div id="new-user-result" class="notice" hidden></div>
           </form>
           <div class="card">
-            <h2>WhatsApp</h2>
-            <p class="muted small">Stuurt een testbericht naar iedereen met een ingesteld gsm-nummer. De provider stel je in bij de Edge Function (WHATSAPP_PROVIDER).</p>
-            <button id="wa-test" class="ghost">Testbericht versturen</button>
+            <h2>Meldingen testen</h2>
+            <p class="muted small">Stuurt een testmail naar jezelf, en een WhatsApp-test naar iedereen met een ingesteld gsm-nummer (als WhatsApp aan staat).</p>
+            <button id="mail-test" class="ghost">Testmail naar mezelf</button>
+            <button id="wa-test" class="ghost">WhatsApp-test</button>
             <p class="small" id="wa-test-result"></p>
           </div>
         </div>
         <div class="card">
           <h2>Gebruikers</h2>
           <div class="table-wrap"><table id="users-table">
-            <thead><tr><th>Naam</th><th>E-mail</th><th>Partij</th><th>Beheerder</th><th>Actief</th><th>WhatsApp</th><th></th></tr></thead>
+            <thead><tr><th>Naam</th><th>E-mail</th><th>Partij</th><th>Beheerder</th><th>Actief</th><th>Meldingen</th><th></th></tr></thead>
             <tbody></tbody>
           </table></div>
         </div>

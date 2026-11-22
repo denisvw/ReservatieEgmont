@@ -195,7 +195,7 @@ function initApp() {
 }
 
 async function loadPeople() {
-  const people = await check(db.from('profiles').select('id, name, party, email, phone, is_admin, active, must_change_password, notify_whatsapp').order('name'));
+  const people = await check(db.from('profiles').select('id, name, party, email, phone, is_admin, active, must_change_password, notify_whatsapp, notify_email_reservations, notify_email_chat').order('name'));
   state.people = new Map(people.map((p) => [p.id, p]));
   return people;
 }
@@ -492,6 +492,9 @@ async function fillProfile() {
   f.name.value = u.name;
   f.phone.value = u.phone || '';
   f.notify_whatsapp.checked = u.notify_whatsapp;
+  f.notify_email_reservations.checked = u.notify_email_reservations;
+  f.notify_email_chat.checked = u.notify_email_chat;
+  $('#profile-email').textContent = u.email;
   f.callmebot_key.value = '';
   const { data: key } = await db.from('whatsapp_keys').select('user_id').eq('user_id', u.id).maybeSingle();
   f.callmebot_key.placeholder = key ? 'ingesteld – laat leeg om te behouden' : 'nog niet ingesteld';
@@ -506,7 +509,13 @@ $('#profile-form').addEventListener('submit', async (e) => {
     if (!name) throw new Error('Naam is verplicht.');
     const user = await check(
       db.from('profiles')
-        .update({ name, phone: f.phone.value.trim() || null, notify_whatsapp: f.notify_whatsapp.checked })
+        .update({
+          name,
+          phone: f.phone.value.trim() || null,
+          notify_whatsapp: f.notify_whatsapp.checked,
+          notify_email_reservations: f.notify_email_reservations.checked,
+          notify_email_chat: f.notify_email_chat.checked,
+        })
         .eq('id', state.user.id).select().single()
     );
     const key = f.callmebot_key.value.trim();
@@ -559,7 +568,11 @@ async function loadUsers() {
         ),
         el('td', {}, el('input', { type: 'checkbox', checked: u.is_admin, disabled: isMe, onchange: (e) => updateUser(u.id, { is_admin: e.target.checked }) })),
         el('td', {}, el('input', { type: 'checkbox', checked: u.active, disabled: isMe, onchange: (e) => updateUser(u.id, { active: e.target.checked }) })),
-        el('td', { class: 'small' }, u.phone ? `${u.phone}${u.notify_whatsapp ? '' : ' (uit)'}` : '—'),
+        el('td', { class: 'small' }, [
+          u.notify_email_reservations ? 'mail' : null,
+          u.notify_email_chat ? 'mail chat' : null,
+          u.phone && u.notify_whatsapp ? 'WhatsApp' : null,
+        ].filter(Boolean).join(', ') || 'geen'),
         el(
           'td',
           { class: 'nowrap' },
@@ -613,7 +626,6 @@ $('#new-user-form').addEventListener('submit', async (e) => {
       name: f.name.value,
       email: f.email.value,
       party: f.party.value || null,
-      phone: f.phone.value,
       is_admin: f.is_admin.checked,
     });
     const box = $('#new-user-result');
@@ -630,6 +642,17 @@ $('#new-user-form').addEventListener('submit', async (e) => {
     showError(f, err.message);
   } finally {
     btn.disabled = false;
+  }
+});
+
+$('#mail-test').addEventListener('click', async () => {
+  const out = $('#wa-test-result');
+  out.textContent = 'Bezig…';
+  try {
+    await callFunction({ action: 'mail-test' });
+    out.textContent = `Testmail verstuurd naar ${state.user.email}. Kijk ook in je spam.`;
+  } catch (err) {
+    out.textContent = err.message;
   }
 });
 

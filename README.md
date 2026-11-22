@@ -12,7 +12,7 @@ ReservatieEgmont/
     _headers               beveiligingsinstellingen voor Netlify
   supabase/
     schema.sql             database, partijen en beveiliging
-    functions/egmont/      WhatsApp-meldingen en gebruikers aanmaken
+    functions/egmont/      e-mailmeldingen (en optioneel WhatsApp) en gebruikers aanmaken
   .github/workflows/
     wakker-houden.yml      houdt een gratis Supabase-project actief
 ```
@@ -25,8 +25,9 @@ ReservatieEgmont/
   - Een familielid reserveert, wijzigt of annuleert alleen voor de eigen partij.
   - Alleen de beheerder geeft externe verhuur in.
   - Twee reservaties kunnen nooit overlappen. De vertrekdag mag wel de aankomstdag van de volgende zijn.
-- **Chat**: elk bericht gaat ook via WhatsApp naar de anderen. Elke nieuwe, gewijzigde of geannuleerde reservatie komt automatisch in de chat en gaat dus ook via WhatsApp rond.
-- **Beheer**: gebruikers aanmaken, aan een partij koppelen, beheerder maken, (de)activeren, een nieuw tijdelijk paswoord geven of verwijderen, en een WhatsApp-test sturen.
+- **Meldingen per e-mail**: elke nieuwe, gewijzigde of geannuleerde reservatie komt in de chat en gaat per mail naar alle anderen. Niemand moet daarvoor iets instellen. Wie ook bij elk chatbericht een mail wil, of helemaal geen mail, kiest dat zelf op **Profiel**. WhatsApp via CallMeBot kan er optioneel bij.
+- **Chat** om berichten te delen met de hele familie.
+- **Beheer**: gebruikers aanmaken, aan een partij koppelen, beheerder maken, (de)activeren, een nieuw tijdelijk paswoord geven of verwijderen, en een testmail sturen.
 
 ---
 
@@ -36,7 +37,7 @@ Totaal ±1,5 uur. Een pas gekocht domein heeft soms een paar uur nodig voor het 
 
 De site komt op **`https://zee.vanwaetermeulen.be`**. Zo blijft `vanwaetermeulen.be` zelf vrij voor later, bv. een familiesite of e-mailadressen. Wil je toch de site op `vanwaetermeulen.be` zelf, zie de opmerking bij stap 4.
 
-**Wat je nodig hebt:** je GitHub- en Netlify-account (dezelfde als voor Gilles' world), je Combell-account met het domein `vanwaetermeulen.be`, en ongeveer een halfuur voor elk familielid om in te loggen en WhatsApp te koppelen.
+**Wat je nodig hebt:** je GitHub- en Netlify-account (dezelfde als voor Gilles' world), je Combell-account met het domein `vanwaetermeulen.be`, en je Resend-account (dat van Gilles' world).
 
 Het domein staat bij **Combell**, maar het DNS-beheer doet **Netlify**. Zo werkt alles verder zoals bij Gilles' world: de site, het certificaat en de mailrecords regel je in Netlify. Combell stuurt je enkel nog de jaarlijkse factuur.
 
@@ -90,7 +91,7 @@ Het domein staat bij **Combell**, maar het DNS-beheer doet **Netlify**. Zo werkt
 
 > **Liever de site op `vanwaetermeulen.be` zelf?** Voeg dan in stap 4 `vanwaetermeulen.be` toe in plaats van `zee.vanwaetermeulen.be`. Netlify voegt `www.vanwaetermeulen.be` er vanzelf bij. Vervang overal in dit stappenplan `zee.vanwaetermeulen.be` door `vanwaetermeulen.be`.
 
-### Stap 5: e-mail voor *Paswoord vergeten* via Resend (±10 min)
+### Stap 5: e-mail via Resend (meldingen en *Paswoord vergeten*, ±10 min)
 
 1. Log in op **resend.com** met je bestaande account (dat van Gilles' world). Kies **Domains → Add domain** → `vanwaetermeulen.be`, regio **Ireland (eu-west-1)**.
 2. Resend toont 3 à 4 DNS-records: een `MX` en een `TXT` op `send`, een `TXT` op `resend._domainkey` en eventueel een `TXT` `_dmarc`. Zet ze in Netlify via **DNS → vanwaetermeulen.be → Add new record**:
@@ -103,7 +104,8 @@ Het domein staat bij **Combell**, maar het DNS-beheer doet **Netlify**. Zo werkt
 4. Ga in Supabase naar **Authentication → Emails → SMTP Settings** en zet *Enable Custom SMTP* aan:
    - Sender email `zee@vanwaetermeulen.be`, sender name `Appartement aan zee`
    - Host `smtp.resend.com`, port `465`, username `resend`, password = de nieuwe Resend API key
-5. Optioneel: onder **Emails → Templates → Reset Password** het onderwerp en de tekst in het Nederlands zetten, bv. onderwerp *Nieuw paswoord voor het appartement aan zee*.
+5. Bewaar dezelfde API key ook bij **Edge Functions → Secrets** (zie stap 7) als `RESEND_API_KEY`. Daarmee verstuurt de site de meldingen.
+6. Optioneel: onder **Emails → Templates → Reset Password** het onderwerp en de tekst in het Nederlands zetten, bv. onderwerp *Nieuw paswoord voor het appartement aan zee*.
 
 ### Stap 6: jezelf beheerder maken (±5 min)
 
@@ -117,29 +119,29 @@ Het domein staat bij **Combell**, maar het DNS-beheer doet **Netlify**. Zo werkt
    ```
 3. Log in op `https://zee.vanwaetermeulen.be` (of nog op het Netlify-adres). Je ziet de kalender en het tabblad **Beheer**.
 
-### Stap 7: WhatsApp en beheer (Edge Function, ±15 min)
+### Stap 7: meldingen en beheer (Edge Function, ±15 min)
 
 1. Ga in Supabase naar **Edge Functions → Deploy a new function → Via Editor**. Naam: **`egmont`**. Plak de inhoud van `supabase/functions/egmont/index.ts` en klik *Deploy*. Zet daarna bij de functie onder *Details* **Verify JWT with legacy secret** (of *Enforce JWT*) **uit**. De functie controleert zelf wie haar aanroept.
 2. Vul bij **Edge Functions → Secrets** in:
    - `WEBHOOK_SECRET`: een lange willekeurige tekst die je zelf verzint (bv. 40 tekens uit een paswoordgenerator)
    - `SITE_URL`: `https://zee.vanwaetermeulen.be`
-   - `WHATSAPP_PROVIDER`: eerst `none`, na de test in stap 9 `callmebot`
+   - `RESEND_API_KEY`: de Resend API key uit stap 5
+   - `MAIL_FROM`: `Appartement aan zee <zee@vanwaetermeulen.be>`
+   - `WHATSAPP_PROVIDER`: `none` (of `callmebot`, zie stap 9)
 3. Ga naar **Database → Webhooks** (eerst eventueel *Enable webhooks*) → **Create a new hook**:
-   - Naam `whatsapp`, tabel **`messages`**, gebeurtenis **Insert**
+   - Naam `meldingen`, tabel **`messages`**, gebeurtenis **Insert**
    - Type **Supabase Edge Functions**, functie `egmont`, methode POST
    - HTTP-header toevoegen: `x-webhook-secret` = dezelfde tekst als `WEBHOOK_SECRET`
-4. Test in **Beheer**: maak een testgebruiker aan met een tweede e-mailadres. Je krijgt een tijdelijk paswoord te zien. Werkt dat, dan werkt de functie. Verwijder de testgebruiker daarna weer.
+4. Test in **Beheer → Testmail naar mezelf**. Je krijgt binnen een minuut een mail. Kijk ook in je spam.
+5. Test in **Beheer**: maak een testgebruiker aan met een tweede e-mailadres. Je krijgt een tijdelijk paswoord te zien. Werkt dat, dan werkt de functie. Verwijder de testgebruiker daarna weer.
 
 ### Stap 8: wakker houden (1 min)
 
 Een gratis Supabase-project pauzeert na een week zonder bezoek. Ga op GitHub bij de repository naar **Actions** en zet workflows aan als GitHub dat vraagt. Kies **Supabase wakker houden → Run workflow**. Het vinkje moet groen worden. Daarna loopt de taak vanzelf elke drie dagen.
 
-### Stap 9: WhatsApp aanzetten (±5 min voor jou, daarna per familielid)
+### Stap 9 (optioneel): WhatsApp
 
-1. Stuur zelf vanaf je gsm via WhatsApp `I allow callmebot to send me messages` naar het CallMeBot-nummer (zie **callmebot.com** → *WhatsApp* voor het actuele nummer). Je krijgt een API-sleutel terug.
-2. Vul op de site bij **Profiel** je gsm-nummer (`+32…`) en die sleutel in.
-3. Zet in Supabase het secret `WHATSAPP_PROVIDER` op `callmebot`.
-4. Klik in **Beheer** op **Testbericht versturen**. Dat gaat naar iedereen behalve jezelf. Vraag daarom één familielid om eerst stap 1–2 te doen, of laat een tweede account van jezelf het bericht sturen.
+De mails volstaan. Wil iemand de meldingen toch ook via WhatsApp, zie het hoofdstuk **WhatsApp (optioneel)** onderaan.
 
 ### Stap 10: de familie toegang geven
 
@@ -147,21 +149,21 @@ Maak per persoon een account aan in **Beheer → Toegang geven**: naam, e-mailad
 
 > Hallo! Je kan nu het appartement reserveren op https://zee.vanwaetermeulen.be
 > Log in met je e-mailadres en dit tijdelijk paswoord: …
-> Je kiest daarna zelf een paswoord. Wil je WhatsApp-meldingen? Volg de uitleg bij *Profiel*.
+> Je kiest daarna zelf een paswoord. Bij elke wijziging in de kalender krijg je een mail. Bij *Profiel* kan je dat aanpassen.
 
 ### Eindcontrole
 
 - [ ] `https://zee.vanwaetermeulen.be` toont het inlogscherm met een slotje (HTTPS).
 - [ ] Een familielid kan inloggen, moet een eigen paswoord kiezen en kan voor de eigen partij reserveren, maar niet voor een andere partij of EXTERNAL.
 - [ ] Een overlappende reservatie wordt geweigerd.
-- [ ] Een reservatie en een chatbericht komen in de chat **en** via WhatsApp bij de anderen.
+- [ ] Een reservatie komt in de chat **en** per mail bij de anderen.
 - [ ] *Paswoord vergeten?* stuurt een mail van `zee@vanwaetermeulen.be`, en de link laat een nieuw paswoord kiezen.
 - [ ] De GitHub-taak *Supabase wakker houden* staat op groen.
 - [ ] Verwijder in Supabase bij **Redirect URLs** het tijdelijke Netlify-adres.
 
 ---
 
-## WhatsApp
+## WhatsApp (optioneel)
 
 Geen enkele officiële WhatsApp-dienst laat toe te posten in een bestaande **groep**. Iedereen krijgt de melding dus persoonlijk. Wie de actie zelf deed, krijgt geen melding.
 
@@ -180,5 +182,6 @@ Pas in `supabase/schema.sql` de lijst bij `insert into public.parties` aan en vo
 ## Kosten
 
 - Supabase: gratis (aparte gratis organisatie)
-- Netlify en Resend: gratis
+- Netlify: gratis
+- Resend: gratis tot 3000 mails per maand (gedeeld met Gilles' world)
 - Domein `vanwaetermeulen.be` bij Combell: zie je Combell-factuur (±10–15 euro per jaar). Netlify DNS is gratis.

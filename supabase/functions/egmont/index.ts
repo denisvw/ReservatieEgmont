@@ -1,9 +1,11 @@
 // Supabase Edge Function "egmont"
 //
 // Doet twee dingen:
-//  1. WhatsApp: wordt aangeroepen door een Database Webhook op INSERT in
+//  1. Meldingen: wordt aangeroepen door een Database Webhook op INSERT in
 //     public.messages en stuurt elk nieuw bericht (chat of melding over een
-//     reservatie) naar alle actieve gebruikers, behalve wie het zelf deed.
+//     reservatie) per e-mail (en optioneel WhatsApp) naar alle actieve
+//     gebruikers, behalve wie het zelf deed. Elke gebruiker kiest op de pagina
+//     Profiel welke mails hij wil (standaard: enkel wijzigingen in de kalender).
 //  2. Beheer: de beheerpagina roept deze functie aan om gebruikers aan te maken,
 //     een tijdelijk paswoord te geven of te verwijderen (dat vraagt de
 //     service_role-sleutel, die nooit in de website mag staan).
@@ -11,6 +13,8 @@
 // Secrets (Supabase > Edge Functions > Secrets):
 //   WEBHOOK_SECRET     zelfgekozen lange willekeurige tekst (ook in de webhook-header)
 //   SITE_URL           bv. https://zee.vanwaetermeulen.be
+//   RESEND_API_KEY     sleutel van resend.com (voor de e-mailmeldingen)
+//   MAIL_FROM          bv. Appartement aan zee <zee@vanwaetermeulen.be>
 //   WHATSAPP_PROVIDER  none | callmebot | meta          (standaard: none)
 //   Voor meta:  WHATSAPP_TOKEN, WHATSAPP_PHONE_NUMBER_ID,
 //               WHATSAPP_TEMPLATE (optioneel), WHATSAPP_TEMPLATE_LANG (standaard nl)
@@ -99,6 +103,56 @@ async function broadcast(text: string, excludeId: string | null) {
   return { sent, provider };
 }
 
+// ---------------- E-mail (Resend) ----------------
+const esc = (s: string) =>
+  s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+
+function mailHtml(text: string) {
+  const site = env("SITE_URL").replace(/\/$/, "");
+  return `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:15px;line-height:1.5;color:#1f2a33">
+    <p style="white-space:pre-line;margin:0 0 16px">${esc(text)}</p>
+    ${site ? `<p><a href="${site}" style="display:inline-block;background:#0e7490;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none">Open de kalender</a></p>` : ""}
+    <p style="color:#6b7a86;font-size:12px;margin-top:24px">Je krijgt deze mail van de reservatiesite van het appartement aan zee.
+    Welke mails je krijgt, kies je zelf op de pagina Profiel.</p></div>`;
+}
+
+async function sendMails(to: string[], subject: string, text: string) {
+  if (!to.length) return 0;
+  if (!env("RESEND_API_KEY") || !env("MAIL_FROM")) {
+    console.log(`[mail] RESEND_API_KEY/MAIL_FROM ontbreken; niet verstuurd naar ${to.length} ontvanger(s): ${subject}`);
+    return 0;
+  }
+  const html = mailHtml(text);
+  // Eén mail per persoon (niemand ziet de andere adressen); per 100 via de batch-API.
+  let sent = 0;
+  for (let i = 0; i < to.length; i += 100) {
+    const batch = to.slice(i, i + 100).map((addr) => ({ from: env("MAIL_FROM"), to: [addr], subject, html, text }));
+    const res = await fetch("https://api.resend.com/emails/batch", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${env("RESEND_API_KEY")}`, "Content-Type": "application/json" },
+      body: JSON.stringify(batch),
+    });
+    if (!res.ok) console.error(`Resend ${res.status}: ${await res.text()}`);
+    else sent += batch.length;
+  }
+  return sent;
+}
+
+async function mailEveryone(text: string, isChat: boolean, excludeId: string | null) {
+  const { data, error } = await admin
+    .from("profiles")
+    .select("id, email")
+    .eq("active", true)
+    .eq(isChat ? "notify_email_chat" : "notify_email_reservations", true);
+  if (error) throw error;
+  const to = (data ?? []).filter((u) => u.id !== excludeId).map((u) => u.email);
+  // Onderwerp, bv. "Nieuwe reservatie door Celine – Celine & Matthias: 05/01/2027 → 08/01/2027"
+  const lines = text.split("\n").map((l) => l.replace(/^\p{Extended_Pictographic}\uFE0F?\s*/u, ""));
+  const detail = (lines.find((l) => l.startsWith("Nu: ")) ?? lines[1] ?? "").replace(/^Nu: /, "").replace(/ \(\d+ nachten\)$/, "");
+  const subject = (isChat ? `Bericht van ${lines[0]}` : detail ? `${lines[0]} – ${detail}` : lines[0]).slice(0, 140);
+  return sendMails(to, subject, text);
+}
+
 async function handleWebhook(payload: {
   type: string; table: string;
   record: { user_id: string | null; actor_id: string | null; is_system: boolean; body: string };
@@ -110,7 +164,13 @@ async function handleWebhook(payload: {
     const { data } = await admin.from("profiles").select("name").eq("id", m.user_id).single();
     text = `💬 ${data?.name ?? "Iemand"}: ${m.body}`;
   }
-  return json(await broadcast(text, m.is_system ? m.actor_id : m.user_id));
+  const exclude = m.is_system ? m.actor_id : m.user_id;
+  const [mail, whatsapp] = await Promise.allSettled([
+    mailEveryone(text, !m.is_system, exclude),
+    broadcast(text, exclude),
+  ]);
+  for (const r of [mail, whatsapp]) if (r.status === "rejected") console.error(r.reason);
+  return json({ mail: mail.status === "fulfilled" ? mail.value : 0 });
 }
 
 // ---------------- Beheer ----------------
@@ -166,6 +226,15 @@ async function handleAdmin(req: Request, body: Record<string, unknown>) {
       if (id === user.id) return json({ error: "Je kan jezelf niet verwijderen" }, 400);
       const { error } = await admin.auth.admin.deleteUser(id);
       if (error) return json({ error: error.message }, 400);
+      return json({ ok: true });
+    }
+    case "mail-test": {
+      if (!env("RESEND_API_KEY") || !env("MAIL_FROM")) {
+        return json({ error: "RESEND_API_KEY of MAIL_FROM ontbreekt bij de Edge Function-secrets" }, 400);
+      }
+      const n = await sendMails([user.email!], "Testmail van de reservatiesite",
+        `✅ Dit is een testmail.\nDe e-mailmeldingen van de reservatiesite werken.`);
+      if (!n) return json({ error: "Versturen mislukt; bekijk de logs van de Edge Function" }, 500);
       return json({ ok: true });
     }
     case "whatsapp-test":
