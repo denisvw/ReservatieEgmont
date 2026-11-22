@@ -213,3 +213,10 @@ details.help[open] { margin-bottom: .8rem; }
 .mini-day:hover { outline: 2px solid var(--accent); outline-offset: -1px; }
 .narrow-table { max-width: 480px; }
 .num-col { text-align: right; }
+
+/* Reservatie kiezen in het jaaroverzicht */
+.year-hint { font-size: .9rem; color: var(--muted); margin: 0 0 .8rem; min-height: 1.3em; }
+.year-hint.error-hint { color: var(--danger); }
+.mini-day.picked, .mini-day.in-range { background: var(--accent); color: var(--accent-text); font-weight: 700; opacity: 1; }
+.mini-day.in-range { opacity: .75; }
+.mini-day.in-range.bad { background: var(--danger); color: #fff; }

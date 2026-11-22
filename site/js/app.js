@@ -16,6 +16,8 @@ const state = {
   reservations: [],
   holidays: [],
   year: new Date().getFullYear(),
+  yearList: [],
+  pick: null, // gekozen aankomstdag in het jaaroverzicht
   lastMsgId: 0,
   unread: 0,
   editing: null,
@@ -354,7 +356,7 @@ function fillPartySelects() {
   }
 }
 
-function openReservation(r, startDate) {
+function openReservation(r, startDate, endDate) {
   const f = $('#res-form');
   showError(f, '');
   if (!r && !state.parties.some((p) => canManage(p.key))) {
@@ -369,7 +371,7 @@ function openReservation(r, startDate) {
   else fillPartySelects();
   sel.value = r ? r.party : canManage(state.user.party) ? state.user.party : sel.options[0]?.value;
   f.start_date.value = r ? r.start_date : startDate;
-  f.end_date.value = r ? r.end_date : iso(addDays(parseIso(startDate), 7));
+  f.end_date.value = r ? r.end_date : endDate || iso(addDays(parseIso(startDate), 7));
   f.note.value = r ? r.note || '' : '';
   for (const inp of [sel, f.start_date, f.end_date, f.note]) inp.disabled = !editable;
   $('#res-save').hidden = !editable;
@@ -714,6 +716,8 @@ async function loadYear() {
 }
 
 function renderYear(y, list) {
+  state.yearList = list;
+  updateYearHint();
   const today = iso(new Date());
   const months = [];
   for (let m = 0; m < 12; m++) {
@@ -734,11 +738,13 @@ function renderYear(y, list) {
         el(
           'button',
           {
-            class: ['mini-day', p ? 'busy' : '', p?.external ? 'ext' : '', school ? 'school' : '', feest ? 'feest' : '', ds === today ? 'today' : '', ds < today ? 'past' : '']
+            class: ['mini-day', state.pick === ds ? 'picked' : '', p ? 'busy' : '', p?.external ? 'ext' : '', school ? 'school' : '', feest ? 'feest' : '', ds === today ? 'today' : '', ds < today ? 'past' : '']
               .join(' '),
             style: p ? { '--c': p.color } : {},
             title,
-            onclick: () => (r ? openReservation(r) : ds >= today ? openReservation(null, ds) : null),
+            'data-date': ds,
+            onclick: () => yearDayClick(ds, r),
+            onmouseenter: () => previewRange(ds),
           },
           String(d.getDate())
         )
@@ -794,6 +800,84 @@ function renderYear(y, list) {
     el('tr', { class: 'muted' }, el('td', {}, 'Vrij'), el('td', {}, ''), el('td', { class: 'num-col' }, String(free)))
   );
 }
+
+// Reservatie maken in het jaaroverzicht: eerst aankomst-, dan vertrekdag kiezen.
+const occupiedBy = (ds) => state.yearList.find((x) => x.start_date <= ds && ds < x.end_date);
+// Zijn alle nachten van a tot (niet met) b nog vrij?
+const rangeFree = (a, b) => !state.yearList.some((x) => x.start_date < b && x.end_date > a);
+
+function yearDayClick(ds, r) {
+  const today = iso(new Date());
+  if (state.pick) {
+    if (ds === state.pick) return cancelPick();
+    if (ds > state.pick) {
+      if (!rangeFree(state.pick, ds)) {
+        updateYearHint('Die periode overlapt met een bestaande reservatie. Kies een vroegere vertrekdag.');
+        return;
+      }
+      const start = state.pick;
+      cancelPick();
+      openReservation(null, start, ds);
+      return;
+    }
+    // Een vroegere dag: opnieuw beginnen vanaf die dag.
+  } else if (r) {
+    return openReservation(r);
+  }
+  if (ds < today || occupiedBy(ds)) return;
+  if (!state.parties.some((p) => canManage(p.key))) {
+    alert('Je account is nog niet aan een partij gekoppeld. Vraag het aan de beheerder.');
+    return;
+  }
+  state.pick = ds;
+  clearPickMarks();
+  $(`#year-grid .mini-day[data-date="${ds}"]`)?.classList.add('picked');
+  updateYearHint();
+}
+
+function clearPickMarks() {
+  for (const b of $$('#year-grid .mini-day')) {
+    b.classList.toggle('picked', false);
+    b.classList.toggle('in-range', false);
+    b.classList.toggle('bad', false);
+  }
+}
+
+function cancelPick() {
+  state.pick = null;
+  clearPickMarks();
+  updateYearHint();
+}
+
+function previewRange(ds) {
+  if (!state.pick) return;
+  const ok = ds > state.pick && rangeFree(state.pick, ds);
+  for (const b of $$('#year-grid .mini-day')) {
+    const d = b.dataset.date;
+    const inRange = ds > state.pick && d > state.pick && d <= ds;
+    b.classList.toggle('in-range', inRange);
+    b.classList.toggle('bad', inRange && !ok);
+  }
+}
+
+function updateYearHint(error) {
+  const h = $('#year-hint');
+  h.classList.toggle('error-hint', !!error);
+  h.textContent =
+    error ||
+    (state.pick
+      ? `Aankomst ${fmt(state.pick)}. Klik nu op de vertrekdag (of nog eens op de aankomstdag om te annuleren).`
+      : 'Nieuwe reservatie: klik op een vrije dag voor de aankomst en daarna op de vertrekdag. Klik op een gekleurde dag om een reservatie te bekijken.');
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && state.pick) cancelPick();
+});
+$('#year-new').addEventListener('click', () => {
+  const today = iso(new Date());
+  const first = `${state.year}-01-01`;
+  openReservation(null, first > today ? first : today);
+});
 
 $('#year-prev').addEventListener('click', () => {
   state.year -= 1;
