@@ -626,10 +626,15 @@ async function updateUser(id, patch) {
 }
 
 async function resetPassword(u) {
-  if (!confirm(`Nieuw tijdelijk paswoord aanmaken voor ${u.name}?`)) return;
+  if (!confirm(`Nieuw tijdelijk paswoord aanmaken voor ${u.name}? Het wordt ook naar ${u.email} gemaild.`)) return;
   try {
-    const { temp_password } = await callFunction({ action: 'reset-password', id: u.id });
-    prompt(`Tijdelijk paswoord voor ${u.name} (geef dit door):`, temp_password);
+    const { temp_password, mail_sent } = await callFunction({ action: 'reset-password', id: u.id });
+    prompt(
+      mail_sent
+        ? `Gemaild naar ${u.email}. Ter controle, het tijdelijk paswoord van ${u.name}:`
+        : `De mail kon niet verstuurd worden. Geef dit tijdelijk paswoord zelf door aan ${u.name}:`,
+      temp_password
+    );
   } catch (err) {
     alert(err.message);
   }
@@ -659,13 +664,16 @@ $('#new-user-form').addEventListener('submit', async (e) => {
       email: f.email.value,
       party: f.party.value || null,
       is_admin: f.is_admin.checked,
+      send_mail: f.send_mail.checked,
     });
     const box = $('#new-user-result');
     box.hidden = false;
     box.replaceChildren(
       el('b', {}, `${user.name} aangemaakt.`),
       el('br'),
-      'Geef deze gegevens door:',
+      user.mail_sent
+        ? `Er is een welkomstmail met uitleg en het tijdelijk paswoord gestuurd naar ${user.email}. Komt die niet aan (kijk ook in de spam), geef dan deze gegevens zelf door:`
+        : 'Geef deze gegevens zelf door (er is geen mail verstuurd):',
       el('pre', {}, `Site: ${location.origin}\nE-mail: ${user.email}\nTijdelijk paswoord: ${user.temp_password}`)
     );
     f.reset();

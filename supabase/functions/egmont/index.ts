@@ -139,6 +139,70 @@ async function sendMails(to: string[], subject: string, text: string, extra?: { 
   return sent;
 }
 
+// Eén losse mail met eigen opmaak (welkomstmail, nieuw paswoord).
+// replyTo: wie antwoordt, komt bij de beheerder terecht (het afzenderadres ontvangt geen mail).
+async function sendOne(to: string, subject: string, html: string, text: string, replyTo?: string) {
+  if (!env("RESEND_API_KEY") || !env("MAIL_FROM")) return false;
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${env("RESEND_API_KEY")}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ from: env("MAIL_FROM"), to: [to], subject, html, text, ...(replyTo ? { reply_to: replyTo } : {}) }),
+  });
+  if (!res.ok) console.error(`Resend ${res.status}: ${await res.text()}`);
+  return res.ok;
+}
+
+// Welkomstmail bij een nieuw account, of mail met een nieuw tijdelijk paswoord.
+function accountMail(o: {
+  name: string; email: string; password: string; partyLabel: string | null; isAdmin: boolean; inviter: string; reset: boolean;
+}) {
+  const site = env("SITE_URL").replace(/\/$/, "") || "(adres van de site)";
+  const from = (env("MAIL_FROM").match(/<([^>]+)>/)?.[1] ?? env("MAIL_FROM")) || "het afzenderadres";
+  const first = o.name.split(" ")[0];
+  const subject = o.reset ? "Je nieuwe tijdelijk paswoord voor het appartement aan zee" : "Welkom! Je kan nu het appartement aan zee reserveren";
+
+  const intro = o.reset
+    ? `${o.inviter} heeft een nieuw tijdelijk paswoord voor je aangemaakt.`
+    : `${o.inviter} heeft een account voor je aangemaakt op de reservatiesite van ons appartement aan zee. Daar zie je wie wanneer in het appartement verblijft, en kan je zelf reserveren.`;
+
+  const steps: [string, string][] = [
+    ["Inloggen", `Ga naar ${site} en log in met je e-mailadres en het tijdelijk paswoord hierboven. Daarna kies je zelf een paswoord (minstens 8 tekens).`],
+    ["De kalender", `Je ziet het hele jaar in één oogopslag. Elke partij heeft een eigen kleur. Donker gestreept is externe verhuur. Lichtblauw zijn de schoolvakanties, een ★ is een feestdag. Aankomst- en vertrekdag zijn half gekleurd: op een vertrekdag kan de volgende al aankomen. Met ‹ en › blader je naar een ander jaar.`],
+    ["Reserveren", `Klik op een vrije dag voor je aankomst en daarna op de dag dat je weggaat. Het formulier opent met beide data ingevuld; voeg eventueel een opmerking toe en klik Opslaan.${o.partyLabel ? ` Je reserveert voor ${o.partyLabel}.` : ""} Twee reservaties kunnen niet overlappen.`],
+    ["Wijzigen of annuleren", `Klik op een gekleurde dag van je reservatie. Je kan alleen reservaties van je eigen partij wijzigen of verwijderen; die van de anderen kan je wel bekijken.`],
+    ["Meldingen", `Bij elke nieuwe, gewijzigde of geannuleerde reservatie krijgt iedereen een mail, met een overzicht van de komende 12 maanden. Op de pagina Profiel kies je welke mails je wil krijgen. Voeg ${from} toe aan je contacten, zodat de mails niet in je spam belanden.`],
+    ["Chat", `In het tabblad Chat kan je berichten delen met de hele familie.`],
+    ["Paswoord vergeten?", `Klik op het inlogscherm op "Paswoord vergeten?". Je krijgt dan een mail om een nieuw paswoord te kiezen.`],
+  ];
+  if (o.isAdmin) steps.push(["Beheer", "Je bent ook beheerder: in het tabblad Beheer maak je accounts aan en kan je externe verhuur ingeven."]);
+  if (o.reset) steps.splice(1); // bij een reset volstaat de uitleg over inloggen
+
+  const box = `
+    <table cellpadding="0" cellspacing="0" style="background:#f4f7f9;border:1px solid #dde4ea;border-radius:10px;margin:16px 0;font-size:15px">
+      <tr><td style="padding:14px 18px">
+        <div style="color:#6b7a86;font-size:12px">Website</div><div style="margin-bottom:8px"><a href="${esc(site)}" style="color:#0e7490">${esc(site)}</a></div>
+        <div style="color:#6b7a86;font-size:12px">E-mailadres</div><div style="margin-bottom:8px">${esc(o.email)}</div>
+        <div style="color:#6b7a86;font-size:12px">Tijdelijk paswoord</div><div style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:17px;font-weight:700;letter-spacing:.05em">${esc(o.password)}</div>
+      </td></tr>
+    </table>`;
+  const html = `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:15px;line-height:1.5;color:#1f2a33;max-width:560px">
+    <p>Dag ${esc(first)},</p>
+    <p>${esc(intro)}</p>
+    ${box}
+    <p><a href="${esc(site)}" style="display:inline-block;background:#0e7490;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none;font-weight:600">${o.reset ? "Inloggen" : "Naar de kalender"}</a></p>
+    <h3 style="font-size:16px;margin:24px 0 8px">${o.reset ? "Zo ga je verder" : "Zo werkt het"}</h3>
+    ${steps.map(([t, d]) => `<p style="margin:0 0 12px"><b>${esc(t)}</b><br>${esc(d)}</p>`).join("")}
+    <p style="color:#6b7a86;font-size:12px;margin-top:24px">Vragen? Antwoord gerust op deze mail of contacteer ${esc(o.inviter)}.</p>
+  </div>`;
+  const text = [
+    `Dag ${first},`, "", intro, "",
+    `Website: ${site}`, `E-mailadres: ${o.email}`, `Tijdelijk paswoord: ${o.password}`, "",
+    o.reset ? "Zo ga je verder" : "Zo werkt het",
+    ...steps.map(([t, d]) => `\n${t}\n${d}`),
+  ].join("\n");
+  return { subject, html, text };
+}
+
 // Overzicht van alle reservaties voor de komende 12 maanden, voor in de mail.
 async function yearOverview() {
   const today = new Date();
@@ -249,15 +313,31 @@ async function handleAdmin(req: Request, body: Record<string, unknown>) {
         must_change_password: true,
       }).eq("id", data.user.id);
       if (e2) return json({ error: e2.message }, 400);
-      return json({ id: data.user.id, email, name, temp_password: password });
+      let mail_sent = false;
+      if (body.send_mail !== false) {
+        const { data: pa } = await admin.from("parties").select("label").eq("key", String(body.party ?? "")).maybeSingle();
+        const m = accountMail({
+          name, email, password, partyLabel: pa?.label ?? null, isAdmin: !!body.is_admin, inviter: me.name, reset: false,
+        });
+        mail_sent = await sendOne(email, m.subject, m.html, m.text, user.email);
+      }
+      return json({ id: data.user.id, email, name, temp_password: password, mail_sent });
     }
     case "reset-password": {
       const id = String(body.id ?? "");
       const password = tempPassword();
       const { error } = await admin.auth.admin.updateUserById(id, { password });
       if (error) return json({ error: error.message }, 400);
-      await admin.from("profiles").update({ must_change_password: true }).eq("id", id);
-      return json({ temp_password: password });
+      const { data: prof } = await admin.from("profiles").update({ must_change_password: true }).eq("id", id)
+        .select("name, email, is_admin").single();
+      let mail_sent = false;
+      if (prof && body.send_mail !== false) {
+        const m = accountMail({
+          name: prof.name, email: prof.email, password, partyLabel: null, isAdmin: prof.is_admin, inviter: me.name, reset: true,
+        });
+        mail_sent = await sendOne(prof.email, m.subject, m.html, m.text, user.email);
+      }
+      return json({ temp_password: password, mail_sent });
     }
     case "delete-user": {
       const id = String(body.id ?? "");
