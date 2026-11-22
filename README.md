@@ -44,10 +44,10 @@ Het domein staat bij **Combell**, maar het DNS-beheer doet **Netlify**. Zo werkt
 
 **1a. Het domein toevoegen in Netlify**
 
-1. Log in op **app.netlify.com**, in hetzelfde team als Gilles' world. Klik links op **Domains → Add or register domain**.
+1. Log in op **app.netlify.com**, in hetzelfde team als Gilles' world. Klik links in het teammenu op **DNS** (in sommige versies **Domains**) → **Add domain** (of *Add or register domain*).
 2. Typ `vanwaetermeulen.be` en klik *Verify*. Netlify ziet dat het domein al bestaat. Bevestig dat het van jou is (*Add domain* / *Yes, add domain*).
 3. Kies **Set up Netlify DNS** en klik door. Records die Netlify voorstelt, mag je overslaan: er staat nog niets op het domein.
-4. Op het laatste scherm toont Netlify **vier nameservers**, bv. `dns1.p05.nsone.net` tot `dns4.p05.nsone.net`. Laat dat scherm open of noteer ze. Je vindt ze later ook terug bij **Domains → vanwaetermeulen.be → DNS settings**.
+4. Op het laatste scherm toont Netlify **vier nameservers**, bv. `dns1.p05.nsone.net` tot `dns4.p05.nsone.net`. Laat dat scherm open of noteer ze. Je vindt ze later ook terug bij **DNS → vanwaetermeulen.be**.
 
 **1b. De nameservers invullen bij Combell**
 
@@ -55,7 +55,7 @@ Het domein staat bij **Combell**, maar het DNS-beheer doet **Netlify**. Zo werkt
 2. Staat **DNSSEC** aan, zet het dan eerst **uit**. Met DNSSEC aan kan de overstap naar Netlify mislukken.
 3. Kies **Naamservers** (ook *Nameservers* of *DNS-servers wijzigen*) → **Eigen/aangepaste naamservers**.
 4. Vervang de naamservers van Combell door de vier van Netlify, één per regel, en bewaar.
-5. Wacht. Na enkele minuten tot hoogstens een paar uur staat in Netlify bij **Domains → vanwaetermeulen.be** dat Netlify DNS actief is. Doe intussen gerust stap 2 en 3.
+5. Wacht. Na enkele minuten tot hoogstens een paar uur staat in Netlify bij **DNS → vanwaetermeulen.be** dat Netlify DNS actief is. Doe intussen gerust stap 2 en 3.
 
 > Combell kan waarschuwen dat de DNS-instellingen bij Combell niet meer gebruikt worden. Dat klopt en is de bedoeling: vanaf nu wijzig je DNS-records enkel nog in Netlify.
 
@@ -93,7 +93,7 @@ Het domein staat bij **Combell**, maar het DNS-beheer doet **Netlify**. Zo werkt
 ### Stap 5: e-mail voor *Paswoord vergeten* via Resend (±10 min)
 
 1. Log in op **resend.com** met je bestaande account (dat van Gilles' world). Kies **Domains → Add domain** → `vanwaetermeulen.be`, regio **Ireland (eu-west-1)**.
-2. Resend toont 3 à 4 DNS-records: een `MX` en een `TXT` op `send`, een `TXT` op `resend._domainkey` en eventueel een `TXT` `_dmarc`. Zet ze in Netlify via **Domains → vanwaetermeulen.be → DNS settings → Add new record**:
+2. Resend toont 3 à 4 DNS-records: een `MX` en een `TXT` op `send`, een `TXT` op `resend._domainkey` en eventueel een `TXT` `_dmarc`. Zet ze in Netlify via **DNS → vanwaetermeulen.be → Add new record**:
    - **Record type**: zoals Resend toont (`MX` of `TXT`)
    - **Name**: enkel het deel vóór `.vanwaetermeulen.be`, dus `send`, `resend._domainkey` of `_dmarc`. Netlify vult `.vanwaetermeulen.be` zelf aan.
    - **Value**: kopieer exact uit Resend. Bij het `MX`-record vul je de **Priority** apart in (meestal `10`).
